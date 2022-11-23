@@ -1,0 +1,13 @@
+image: archlinux
+packages:
+  - go
+sources:
+  - https://github.com/go-ap/storage-boltdb
+environment:
+  GO111MODULE: 'on'
+tasks:
+  - tests: |
+      cd storage-boltdb && make test
+  - coverage: |
+      set -a +x
+      cd storage-boltdb && make coverage

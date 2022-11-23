@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/go-ap/errors"
-	"github.com/go-ap/fedbox/internal/config"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -15,16 +14,9 @@ func TestBootstrap(t *testing.T) {
 	dir := os.TempDir()
 	bucket := []byte(rootBucket)
 	url := "random-string-not-an-URL"
-	conf := config.Options{
-		StoragePath: dir,
-		Host:        "example.com",
-		BaseURL:     url,
-	}
-	path, _ := Path(Config{
-		Path:    dir,
-		BaseURL: url,
-	})
-	err := Bootstrap(conf)
+	conf := Config{Path: dir}
+	path, _ := Path(Config{Path: dir})
+	err := Bootstrap(conf, url)
 	if err != nil {
 		t.Errorf("Error received when cleaning valid boltdb %s with valid root bucket %s: %s", path, bucket, err)
 	}
@@ -65,16 +57,9 @@ func TestBootstrap(t *testing.T) {
 
 func TestClean(t *testing.T) {
 	dir := os.TempDir()
-	url := "random-string-not-an-URL"
-	conf := config.Options{
-		StoragePath: dir,
-		Host:        "example.com",
-		BaseURL:     url,
-	}
-	path, _ := Path(Config{
-		Path:    dir,
-		BaseURL: url,
-	})
+
+	conf := Config{Path: dir}
+	path, _ := Path(conf)
 	{
 		Clean(conf)
 	}

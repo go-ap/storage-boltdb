@@ -27,7 +27,6 @@ var decodeFn = jsonld.Unmarshal
 
 type repo struct {
 	d       *bolt.DB
-	baseURL string
 	root    []byte
 	path    string
 	logFn   loggerFn
@@ -62,7 +61,6 @@ func New(c Config) (*repo, error) {
 	b := repo{
 		root:    []byte(rootBucket),
 		path:    p,
-		baseURL: c.BaseURL,
 		logFn:   emptyLogFn,
 		errFn:   emptyLogFn,
 	}
@@ -352,15 +350,6 @@ func (r *repo) loadFromBucket(f processing.Filterable) (vocab.ItemCollection, er
 	return col, err
 }
 
-func (r repo) buildIRIs(c vocab.CollectionPath, hashes ...ap.Hash) vocab.IRIs {
-	iris := make(vocab.IRIs, 0)
-	for _, hash := range hashes {
-		i := c.IRI(vocab.IRI(r.baseURL)).AddPath(hash.String())
-		iris = append(iris, i)
-	}
-	return iris
-}
-
 // Load
 func (r *repo) Load(i vocab.IRI) (vocab.Item, error) {
 	if err := r.Open(); err != nil {
@@ -641,11 +630,6 @@ func (r *repo) Save(it vocab.Item) (vocab.Item, error) {
 	return it, err
 }
 
-// IsLocalIRI shows if the received IRI belongs to the current instance
-func (r repo) IsLocalIRI(i vocab.IRI) bool {
-	return i.Contains(vocab.IRI(r.baseURL), false)
-}
-
 func onCollection(r *repo, col vocab.IRI, it vocab.Item, fn func(iris vocab.IRIs) (vocab.IRIs, error)) error {
 	if vocab.IsNil(it) {
 		return errors.Newf("Unable to operate on nil element")
@@ -655,9 +639,6 @@ func onCollection(r *repo, col vocab.IRI, it vocab.Item, fn func(iris vocab.IRIs
 	}
 	if len(it.GetLink()) == 0 {
 		return errors.Newf("Invalid collection, it does not have a valid IRI")
-	}
-	if !r.IsLocalIRI(col.GetLink()) {
-		return errors.Newf("Unable to save to non local collection %s", col)
 	}
 	path := itemBucketPath(col.GetLink())
 	err := r.Open()

@@ -7,25 +7,19 @@ import (
 	"testing"
 
 	"git.sr.ht/~mariusor/lw"
-	"github.com/go-ap/fedbox/internal/config"
 )
 
 func TestNew(t *testing.T) {
 	dir := os.TempDir()
-	url := "random-string-not-an-URL"
 
 	conf := Config{
-		Path:    dir,
-		BaseURL: url,
-		LogFn:   func(f lw.Ctx, s string, p ...interface{}) { t.Logf(s, p...) },
-		ErrFn:   func(f lw.Ctx, s string, p ...interface{}) { t.Errorf(s, p...) },
+		Path:  dir,
+		LogFn: func(f lw.Ctx, s string, p ...interface{}) { t.Logf(s, p...) },
+		ErrFn: func(f lw.Ctx, s string, p ...interface{}) { t.Errorf(s, p...) },
 	}
 	repo, _ := New(conf)
 	if repo == nil {
 		t.Errorf("Nil result from opening boltdb %s", repo.path)
-	}
-	if repo.baseURL != url {
-		t.Errorf("Wrong configured base URL %s, expected %s", repo.baseURL, url)
 	}
 	if repo.d != nil {
 		t.Errorf("Non nil boltdb from New")
@@ -41,17 +35,9 @@ func TestNew(t *testing.T) {
 func TestRepo_Open(t *testing.T) {
 	dir := os.TempDir()
 	url := "random-string-not-an-URL"
-	c := config.Options{
-		StoragePath: dir,
-		Host:        "example.com",
-		BaseURL:     url,
-	}
-	conf := Config{
-		Path:    dir,
-		BaseURL: url,
-	}
+	conf := Config{Path: dir}
 	path, _ := Path(conf)
-	err := Bootstrap(c)
+	err := Bootstrap(conf, url)
 	if err != nil {
 		t.Errorf("Unable to bootstrap boltdb %s: %s", path, err)
 	}
@@ -72,17 +58,11 @@ func TestRepo_Open(t *testing.T) {
 func TestRepo_Close(t *testing.T) {
 	dir := os.TempDir()
 	url := "random-string-not-an-URL"
-	c := config.Options{
-		StoragePath: dir,
-		Host:        "example.com",
-		BaseURL:     url,
-	}
 	conf := Config{
-		Path:    dir,
-		BaseURL: url,
+		Path: dir,
 	}
 	path, _ := Path(conf)
-	err := Bootstrap(c)
+	err := Bootstrap(conf, url)
 	if err != nil {
 		t.Errorf("Unable to bootstrap boltdb %s: %s", path, err)
 	}
