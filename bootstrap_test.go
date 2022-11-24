@@ -9,7 +9,7 @@ import (
 )
 
 func TestBootstrap(t *testing.T) {
-	dir := os.TempDir()
+	dir := t.TempDir()
 	bucket := []byte(rootBucket)
 	url := "random-string-not-an-URL"
 	conf := Config{Path: dir}

@@ -5,7 +5,6 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
-	"git.sr.ht/~mariusor/lw"
 	"os"
 	"path"
 	"path/filepath"
@@ -31,7 +30,7 @@ type repo struct {
 	errFn   loggerFn
 }
 
-type loggerFn func(lw.Ctx, string, ...interface{})
+type loggerFn func(string, ...interface{})
 
 const (
 	rootBucket       = ":"
@@ -48,7 +47,7 @@ type Config struct {
 	ErrFn   loggerFn
 }
 
-var emptyLogFn = func(lw.Ctx, string, ...interface{}) {}
+var defaultLogFn = func(string, ...interface{}) {}
 
 // New returns a new repo repository
 func New(c Config) (*repo, error) {
@@ -57,10 +56,10 @@ func New(c Config) (*repo, error) {
 		return nil, err
 	}
 	b := repo{
-		root:    []byte(rootBucket),
-		path:    p,
-		logFn:   emptyLogFn,
-		errFn:   emptyLogFn,
+		root:  []byte(rootBucket),
+		path:  p,
+		logFn: defaultLogFn,
+		errFn: defaultLogFn,
 	}
 	if c.ErrFn != nil {
 		b.errFn = c.ErrFn
@@ -416,7 +415,7 @@ func delete(r *repo, it vocab.Item) error {
 			var err error
 			for _, it := range c.Collection() {
 				if err = deleteItem(r, it); err != nil {
-					r.logFn(nil, "Unable to remove item %s", it.GetLink())
+					r.logFn("Unable to remove item %s", it.GetLink())
 				}
 			}
 			return nil
@@ -622,7 +621,7 @@ func (r *repo) Save(it vocab.Item) (vocab.Item, error) {
 		if !id.IsValid() {
 			op = "Added new"
 		}
-		r.logFn(nil, "%s %s: %s", op, it.GetType(), it.GetLink())
+		r.logFn("%s %s: %s", op, it.GetType(), it.GetLink())
 	}
 
 	return it, err
@@ -753,8 +752,7 @@ func (r *repo) Open() error {
 	return nil
 }
 
-// Close closes the boltdb database if possible.
-func (r *repo) Close() error {
+func (r *repo) close() error {
 	if r == nil {
 		return errors.Newf("Unable to close uninitialized db")
 	}

@@ -3,8 +3,6 @@ package boltdb
 import (
 	"os"
 	"testing"
-
-	"git.sr.ht/~mariusor/lw"
 )
 
 func TestNew(t *testing.T) {
@@ -12,8 +10,8 @@ func TestNew(t *testing.T) {
 
 	conf := Config{
 		Path:  dir,
-		LogFn: func(f lw.Ctx, s string, p ...interface{}) { t.Logf(s, p...) },
-		ErrFn: func(f lw.Ctx, s string, p ...interface{}) { t.Errorf(s, p...) },
+		LogFn: func(s string, p ...interface{}) { t.Logf(s, p...) },
+		ErrFn: func(s string, p ...interface{}) { t.Errorf(s, p...) },
 	}
 	repo, _ := New(conf)
 	if repo == nil {
@@ -74,7 +72,7 @@ func TestRepo_Close(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unable to open boltdb %s: %s", path, err)
 	}
-	err = repo.Close()
+	err = repo.close()
 	if err != nil {
 		t.Errorf("Unable to close boltdb %s: %s", path, err)
 	}

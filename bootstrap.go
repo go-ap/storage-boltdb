@@ -13,7 +13,6 @@ func Bootstrap(conf Config, url string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
 
 	self := ap.Self(ap.DefaultServiceIRI(url))
 	actors := &vocab.OrderedCollection{ID: ap.ActorsType.IRI(&self)}
@@ -28,7 +27,31 @@ func Bootstrap(conf Config, url string) error {
 	if _, err = r.Create(objects); err != nil {
 		return err
 	}
-	return nil
+	db, _ := bolt.Open(r.path, 0600, nil)
+	defer db.Close()
+	return db.Update(func(tx *bolt.Tx) error {
+		root, err := tx.CreateBucketIfNotExists(r.root)
+		if err != nil {
+			return errors.Annotatef(err, "could not create root bucket")
+		}
+		_, err = root.CreateBucketIfNotExists([]byte(accessBucket))
+		if err != nil {
+			return errors.Annotatef(err, "could not create %s bucket", accessBucket)
+		}
+		_, err = root.CreateBucketIfNotExists([]byte(refreshBucket))
+		if err != nil {
+			return errors.Annotatef(err, "could not create %s bucket", refreshBucket)
+		}
+		_, err = root.CreateBucketIfNotExists([]byte(authorizeBucket))
+		if err != nil {
+			return errors.Annotatef(err, "could not create %s bucket", authorizeBucket)
+		}
+		_, err = root.CreateBucketIfNotExists([]byte(clientsBucket))
+		if err != nil {
+			return errors.Annotatef(err, "could not create %s bucket", clientsBucket)
+		}
+		return nil
+	})
 }
 
 func createService(b *bolt.DB, service vocab.Service) error {
