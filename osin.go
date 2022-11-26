@@ -2,7 +2,6 @@ package boltdb
 
 import (
 	"bytes"
-	"encoding/json"
 	"time"
 
 	"github.com/go-ap/errors"
@@ -88,7 +87,7 @@ func (r *repo) ListClients() ([]osin.Client, error) {
 		}
 		c := cb.Cursor()
 		for k, raw := c.First(); k != nil; k, raw = c.Next() {
-			if err := json.Unmarshal(raw, &cl); err != nil {
+			if err := decodeFn(raw, &cl); err != nil {
 				r.errFn("Unable to unmarshal client object %s", err)
 				continue
 			}
@@ -127,7 +126,7 @@ func (r *repo) GetClient(id string) (osin.Client, error) {
 			return errors.Newf("Invalid bucket %s/%s", r.root, clientsBucket)
 		}
 		raw := cb.Get([]byte(id))
-		if err := json.Unmarshal(raw, &cl); err != nil {
+		if err := decodeFn(raw, &cl); err != nil {
 			return errors.Annotatef(err, "Unable to unmarshal client object")
 		}
 		c.Id = cl.Id
@@ -153,7 +152,7 @@ func (r *repo) UpdateClient(c osin.Client) error {
 		RedirectUri: c.GetRedirectUri(),
 		Extra:       c.GetUserData(),
 	}
-	raw, err := json.Marshal(cl)
+	raw, err := encodeFn(cl)
 	if err != nil {
 		return errors.Annotatef(err, "Unable to marshal client object")
 	}
@@ -213,7 +212,7 @@ func (r *repo) SaveAuthorize(data *osin.AuthorizeData) error {
 		CreatedAt:   data.CreatedAt.UTC(),
 		Extra:       data.UserData,
 	}
-	raw, err := json.Marshal(auth)
+	raw, err := encodeFn(auth)
 	if err != nil {
 		return errors.Annotatef(err, "Unable to marshal authorization object")
 	}
@@ -256,7 +255,7 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 		}
 		raw := ab.Get([]byte(code))
 
-		if err := json.Unmarshal(raw, &auth); err != nil {
+		if err := decodeFn(raw, &auth); err != nil {
 			err = errors.Annotatef(err, "Unable to unmarshal authorization object")
 			r.errFn("Authorization code %s: %+s", code, err)
 			return err
@@ -280,7 +279,7 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 		cb := rb.Bucket([]byte(clientsBucket))
 		if cb != nil {
 			rawC := cb.Get([]byte(auth.Client))
-			if err := json.Unmarshal(rawC, &cl); err != nil {
+			if err := decodeFn(rawC, &cl); err != nil {
 				err = errors.Annotatef(err, "Unable to unmarshal client object")
 				r.errFn("Authorize code %s: %+s", code, err)
 				return nil
@@ -365,7 +364,7 @@ func (r *repo) SaveAccess(data *osin.AccessData) error {
 		CreatedAt:    data.CreatedAt.UTC(),
 		Extra:        data.UserData,
 	}
-	raw, err := json.Marshal(acc)
+	raw, err := encodeFn(acc)
 	if err != nil {
 		return errors.Annotatef(err, "Unable to marshal access object")
 	}
@@ -410,7 +409,7 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 		if raw == nil {
 			return errors.Newf("Unable to load access information for %s/%s/%s", r.root, accessBucket, code)
 		}
-		if err := json.Unmarshal(raw, &access); err != nil {
+		if err := decodeFn(raw, &access); err != nil {
 			return errors.Annotatef(err, "Unable to unmarshal access object")
 		}
 		result.AccessToken = access.AccessToken
@@ -429,7 +428,7 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 			return nil
 		}
 		rawC := cb.Get([]byte(access.Client))
-		if err := json.Unmarshal(rawC, &cl); err != nil {
+		if err := decodeFn(rawC, &cl); err != nil {
 			r.errFn("Access code %s: %+s", code, errors.Annotatef(err, "Unable to unmarshal client object"))
 			return nil
 		}
@@ -457,7 +456,7 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 				r.errFn("Access code %s: %+s", code, errors.Newf("Invalid authorize data"))
 				return nil
 			}
-			if err := json.Unmarshal(rawAuth, &auth); err != nil {
+			if err := decodeFn(rawAuth, &auth); err != nil {
 				r.errFn("Client code %s: %+s", code, errors.Annotatef(err, "Unable to unmarshal authorization object"))
 				return nil
 			}
@@ -481,7 +480,7 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 		if access.Previous != "" {
 			var prevAccess acc
 			rawPrev := ab.Get([]byte(access.Previous))
-			if err := json.Unmarshal(rawPrev, &prevAccess); err != nil {
+			if err := decodeFn(rawPrev, &prevAccess); err != nil {
 				r.errFn("Access code %s: %+s", code, errors.Annotatef(err, "Unable to unmarshal previous access object"))
 				return nil
 			}
@@ -542,7 +541,7 @@ func (r *repo) LoadRefresh(code string) (*osin.AccessData, error) {
 			return errors.Errorf("Invalid bucket cursor %s/%s", r.root, refreshBucket)
 		}
 		for k, v := u.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = u.Next() {
-			if err := json.Unmarshal(v, &ref); err != nil {
+			if err := decodeFn(v, &ref); err != nil {
 				return errors.Annotatef(err, "Unable to unmarshal refresh token object")
 			}
 		}
@@ -578,7 +577,7 @@ func (r *repo) saveRefresh(refresh, access string) error {
 	ref := ref{
 		Access: access,
 	}
-	raw, err := json.Marshal(ref)
+	raw, err := encodeFn(ref)
 	if err != nil {
 		return errors.Annotatef(err, "Unable to marshal refresh token object")
 	}

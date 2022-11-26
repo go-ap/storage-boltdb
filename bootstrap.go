@@ -4,7 +4,6 @@ import (
 	vocab "github.com/go-ap/activitypub"
 	"github.com/go-ap/errors"
 	ap "github.com/go-ap/fedbox/activitypub"
-	"github.com/go-ap/jsonld"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -55,7 +54,7 @@ func Bootstrap(conf Config, url string) error {
 }
 
 func createService(b *bolt.DB, service vocab.Service) error {
-	raw, err := jsonld.Marshal(service)
+	raw, err := encodeItemFn(service)
 	if err != nil {
 		return errors.Annotatef(err, "could not marshal service json")
 	}

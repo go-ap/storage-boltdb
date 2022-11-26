@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/x509"
+	"encoding/gob"
 	"encoding/pem"
 	"os"
 	"path"
@@ -13,21 +14,30 @@ import (
 	"github.com/go-ap/errors"
 	ap "github.com/go-ap/fedbox/activitypub"
 	"github.com/go-ap/fedbox/storage"
-	"github.com/go-ap/jsonld"
 	"github.com/go-ap/processing"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var encodeFn = jsonld.Marshal
-var decodeFn = jsonld.Unmarshal
+var encodeItemFn = vocab.GobEncode
+var decodeItemFn = vocab.GobDecode
+
+var encodeFn = func(v any) ([]byte, error) {
+	buf := bytes.Buffer{}
+	err := gob.NewEncoder(&buf).Encode(v)
+	return buf.Bytes(), err
+}
+
+var decodeFn = func(data []byte, m any) error {
+	return gob.NewDecoder(bytes.NewReader(data)).Decode(m)
+}
 
 type repo struct {
-	d       *bolt.DB
-	root    []byte
-	path    string
-	logFn   loggerFn
-	errFn   loggerFn
+	d     *bolt.DB
+	root  []byte
+	path  string
+	logFn loggerFn
+	errFn loggerFn
 }
 
 type loggerFn func(string, ...interface{})
@@ -589,8 +599,6 @@ func save(r *repo, it vocab.Item) (vocab.Item, error) {
 			}
 		}
 
-		// TODO(marius): it's possible to set the encoding/decoding functions on the package or storage object level
-		//  instead of using jsonld.(Un)Marshal like this.
 		entryBytes, err := encodeFn(it)
 		if err != nil {
 			return errors.Annotatef(err, "could not marshal object")
