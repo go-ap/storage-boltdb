@@ -38,10 +38,9 @@ const (
 
 // Config
 type Config struct {
-	Path    string
-	BaseURL string
-	LogFn   loggerFn
-	ErrFn   loggerFn
+	Path  string
+	LogFn loggerFn
+	ErrFn loggerFn
 }
 
 var defaultLogFn = func(string, ...interface{}) {}
@@ -69,14 +68,6 @@ func New(c Config) (*repo, error) {
 	return &b, nil
 }
 
-func loadItem(raw []byte) (vocab.Item, error) {
-	if raw == nil || len(raw) == 0 {
-		// TODO(marius): log this instead of stopping the iteration and returning an error
-		return nil, errors.Errorf("empty raw item")
-	}
-	return decodeItemFn(raw)
-}
-
 func (r *repo) loadItem(b *bolt.Bucket, key []byte, f Filterable) (vocab.Item, error) {
 	// we have found an item
 	if len(key) == 0 {
@@ -84,9 +75,9 @@ func (r *repo) loadItem(b *bolt.Bucket, key []byte, f Filterable) (vocab.Item, e
 	}
 	raw := b.Get(key)
 	if raw == nil {
-		return nil, nil
+		return nil, errors.Newf("not found")
 	}
-	it, err := loadItem(raw)
+	it, err := decodeItemFn(raw)
 	if err != nil {
 		return nil, err
 	}

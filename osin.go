@@ -5,10 +5,15 @@ import (
 	"encoding/gob"
 	"time"
 
+	vocab "github.com/go-ap/activitypub"
 	"github.com/go-ap/errors"
 	"github.com/openshift/osin"
 	bolt "go.etcd.io/bbolt"
 )
+
+func init() {
+	gob.Register(vocab.IRI(""))
+}
 
 const (
 	clientsBucket   = "clients"
