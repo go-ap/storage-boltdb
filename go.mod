@@ -3,10 +3,10 @@ module github.com/go-ap/storage-boltdb
 go 1.18
 
 require (
-	github.com/go-ap/activitypub v0.0.0-20221126061933-ea245cac6043
+	github.com/go-ap/activitypub v0.0.0-20221126085132-87fc226acd00
 	github.com/go-ap/errors v0.0.0-20221115052505-8aaa26f930b4
 	github.com/go-ap/fedbox v0.0.0-20221120045022-07cf64331c4c
-	github.com/go-ap/processing v0.0.0-20221126063104-53445d2dd53c
+	github.com/go-ap/processing v0.0.0-20221126085726-c2d5655ad988
 	github.com/openshift/osin v1.0.1
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.3.0
@@ -15,7 +15,7 @@ require (
 require (
 	git.sr.ht/~mariusor/go-xsd-duration v0.0.0-20220703122237-02e73435a078 // indirect
 	git.sr.ht/~mariusor/lw v0.0.0-20221124080058-e91ea2c1fdc2 // indirect
-	github.com/go-ap/client v0.0.0-20221126062204-462866a3146a // indirect
+	github.com/go-ap/client v0.0.0-20221126085340-0f74b463b331 // indirect
 	github.com/go-ap/httpsig v0.0.0-20210714162115-62a09257db51 // indirect
 	github.com/go-ap/jsonld v0.0.0-20221030091449-f2a191312c73 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
