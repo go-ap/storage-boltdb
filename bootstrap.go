@@ -56,7 +56,7 @@ func Bootstrap(conf Config, url string) error {
 func createService(b *bolt.DB, service vocab.Service) error {
 	raw, err := encodeItemFn(service)
 	if err != nil {
-		return errors.Annotatef(err, "could not marshal service json")
+		return errors.Annotatef(err, "could not marshal service")
 	}
 	return b.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists([]byte(rootBucket))
@@ -68,20 +68,16 @@ func createService(b *bolt.DB, service vocab.Service) error {
 		if err != nil {
 			return errors.Annotatef(err, "could not create %s bucket", path)
 		}
-		err = hostBucket.Put([]byte(objectKey), raw)
-		if err != nil {
+		if err := hostBucket.Put([]byte(objectKey), raw); err != nil {
 			return errors.Annotatef(err, "could not save %s[%s]", service.Name, service.Type)
 		}
-		_, err = root.CreateBucketIfNotExists([]byte(bucketActivities))
-		if err != nil {
+		if _, err := hostBucket.CreateBucketIfNotExists([]byte(bucketActivities)); err != nil {
 			return errors.Annotatef(err, "could not create %s bucket", bucketActivities)
 		}
-		_, err = root.CreateBucketIfNotExists([]byte(bucketActors))
-		if err != nil {
+		if _, err := hostBucket.CreateBucketIfNotExists([]byte(bucketActors)); err != nil {
 			return errors.Annotatef(err, "could not create %s bucket", bucketActors)
 		}
-		_, err = root.CreateBucketIfNotExists([]byte(bucketObjects))
-		if err != nil {
+		if _, err := hostBucket.CreateBucketIfNotExists([]byte(bucketObjects)); err != nil {
 			return errors.Annotatef(err, "could not create %s bucket", bucketObjects)
 		}
 		return nil

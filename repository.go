@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/x509"
-	"encoding/gob"
 	"encoding/pem"
 	"os"
-	"path"
 	"path/filepath"
 
 	vocab "github.com/go-ap/activitypub"
@@ -21,16 +19,6 @@ import (
 
 var encodeItemFn = vocab.GobEncode
 var decodeItemFn = vocab.GobDecode
-
-var encodeFn = func(v any) ([]byte, error) {
-	buf := bytes.Buffer{}
-	err := gob.NewEncoder(&buf).Encode(v)
-	return buf.Bytes(), err
-}
-
-var decodeFn = func(data []byte, m any) error {
-	return gob.NewDecoder(bytes.NewReader(data)).Decode(m)
-}
 
 type repo struct {
 	d     *bolt.DB
@@ -85,7 +73,7 @@ func loadItem(raw []byte) (vocab.Item, error) {
 		// TODO(marius): log this instead of stopping the iteration and returning an error
 		return nil, errors.Errorf("empty raw item")
 	}
-	return vocab.UnmarshalJSON(raw)
+	return decodeItemFn(raw)
 }
 
 func (r *repo) loadItem(b *bolt.Bucket, key []byte, f processing.Filterable) (vocab.Item, error) {
@@ -313,7 +301,7 @@ func (r *repo) loadFromBucket(f processing.Filterable) (vocab.ItemCollection, er
 		if b == nil {
 			return errors.Errorf("Invalid bucket %s", fullPath)
 		}
-		lst := vocab.CollectionPath(path.Base(string(fullPath)))
+		lst := vocab.CollectionPath(filepath.Base(string(fullPath)))
 		if isStorageCollectionKey(lst) {
 			fromBucket, _, err := r.iterateInBucket(b, f)
 			if err != nil {
@@ -376,6 +364,8 @@ func (r *repo) Load(i vocab.IRI) (vocab.Item, error) {
 	return ret, err
 }
 
+var pathSeparator = []byte{'/'}
+
 func descendInBucket(root *bolt.Bucket, path []byte, create bool) (*bolt.Bucket, []byte, error) {
 	if root == nil {
 		return nil, path, errors.Newf("trying to descend into nil bucket")
@@ -383,12 +373,12 @@ func descendInBucket(root *bolt.Bucket, path []byte, create bool) (*bolt.Bucket,
 	if len(path) == 0 {
 		return root, path, nil
 	}
-	buckets := bytes.Split(path, []byte{'/'})
+	bucketNames := bytes.Split(bytes.TrimRight(path, string(pathSeparator)), pathSeparator)
 
 	lvl := 0
 	b := root
 	// descend the bucket tree up to the last found bucket
-	for _, name := range buckets {
+	for _, name := range bucketNames {
 		lvl++
 		if len(name) == 0 {
 			continue
@@ -408,8 +398,8 @@ func descendInBucket(root *bolt.Bucket, path []byte, create bool) (*bolt.Bucket,
 		}
 		b = cb
 	}
-	remBuckets := buckets[lvl:]
-	path = bytes.Join(remBuckets, []byte{'/'})
+	remBuckets := bucketNames[lvl:]
+	path = bytes.Join(remBuckets, pathSeparator)
 	if len(remBuckets) > 0 && !ap.HiddenCollections.Contains(vocab.CollectionPath(path)) {
 		return b, path, errors.NotFoundf("%s not found", remBuckets[0])
 	}
@@ -435,6 +425,8 @@ func delete(r *repo, it vocab.Item) error {
 	return deleteItem(r, it.GetLink())
 }
 
+var emptyCollection, _ = encodeItemFn(vocab.IRIs{})
+
 // Create
 func (r *repo) Create(col vocab.CollectionInterface) (vocab.CollectionInterface, error) {
 	var err error
@@ -445,7 +437,7 @@ func (r *repo) Create(col vocab.CollectionInterface) (vocab.CollectionInterface,
 	defer r.Close()
 
 	cPath := itemBucketPath(col.GetLink())
-	c := []byte(path.Base(string(cPath)))
+	c := []byte(filepath.Base(string(cPath)))
 	err = r.d.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists(r.root)
 		if err != nil {
@@ -455,7 +447,7 @@ func (r *repo) Create(col vocab.CollectionInterface) (vocab.CollectionInterface,
 		if err != nil {
 			return errors.Annotatef(err, "Unable to find path %s/%s", r.root, cPath)
 		}
-		return b.Put(c, nil)
+		return b.Put(c, emptyCollection)
 	})
 	return col, err
 }
@@ -472,7 +464,7 @@ func createCollectionInBucket(b *bolt.Bucket, it vocab.Item) (vocab.Item, error)
 	if vocab.IsNil(it) {
 		return nil, nil
 	}
-	p := []byte(path.Base(it.GetLink().String()))
+	p := []byte(filepath.Base(it.GetLink().String()))
 	_, err := b.CreateBucketIfNotExists(p)
 	if err != nil {
 		return nil, err
@@ -573,6 +565,7 @@ func deleteCollectionsFromBucket(b *bolt.Bucket, it vocab.Item) error {
 	}
 	return nil
 }
+
 func save(r *repo, it vocab.Item) (vocab.Item, error) {
 	pathInBucket := itemBucketPath(it.GetLink())
 	err := r.d.Update(func(tx *bolt.Tx) error {
@@ -599,7 +592,7 @@ func save(r *repo, it vocab.Item) (vocab.Item, error) {
 			}
 		}
 
-		entryBytes, err := encodeFn(it)
+		entryBytes, err := encodeItemFn(it)
 		if err != nil {
 			return errors.Annotatef(err, "could not marshal object")
 		}
@@ -675,16 +668,23 @@ func onCollection(r *repo, col vocab.IRI, it vocab.Item, fn func(iris vocab.IRIs
 		var iris vocab.IRIs
 		raw := b.Get(rem)
 		if len(raw) > 0 {
-			err := decodeFn(raw, &iris)
+			it, err := decodeItemFn(raw)
 			if err != nil {
-				return errors.Newf("Unable to unmarshal entries in collection %s", path)
+				return errors.Newf("Unable to unmarshal collection %s", path)
+			}
+			err = vocab.OnIRIs(it, func(col *vocab.IRIs) error {
+				iris = *col
+				return nil
+			})
+			if err != nil {
+				return errors.Newf("Unable to unmarshal to IRI collection %s", path)
 			}
 		}
 		iris, err = fn(iris)
 		if err != nil {
 			return errors.Annotatef(err, "Unable operate on collection %s", path)
 		}
-		raw, err = encodeFn(iris)
+		raw, err = encodeItemFn(iris)
 		if err != nil {
 			return errors.Newf("Unable to marshal entries in collection %s", path)
 		}
@@ -947,7 +947,7 @@ func Path(c Config) (string, error) {
 	if err := mkDirIfNotExists(c.Path); err != nil {
 		return "", err
 	}
-	p := path.Join(c.Path, "storage.bdb")
+	p := filepath.Join(c.Path, "storage.bdb")
 	return p, nil
 }
 

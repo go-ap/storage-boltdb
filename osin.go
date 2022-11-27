@@ -2,6 +2,7 @@ package boltdb
 
 import (
 	"bytes"
+	"encoding/gob"
 	"time"
 
 	"github.com/go-ap/errors"
@@ -49,6 +50,16 @@ type acc struct {
 
 type ref struct {
 	Access string
+}
+
+var encodeFn = func(v any) ([]byte, error) {
+	buf := bytes.Buffer{}
+	err := gob.NewEncoder(&buf).Encode(v)
+	return buf.Bytes(), err
+}
+
+var decodeFn = func(data []byte, m any) error {
+	return gob.NewDecoder(bytes.NewReader(data)).Decode(m)
 }
 
 // Clone the storage if needed. For example, using mgo, you can clone the session with session.Clone
