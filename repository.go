@@ -12,7 +12,6 @@ import (
 	"github.com/go-ap/errors"
 	ap "github.com/go-ap/fedbox/activitypub"
 	"github.com/go-ap/fedbox/storage"
-	"github.com/go-ap/processing"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -47,6 +46,8 @@ type Config struct {
 
 var defaultLogFn = func(string, ...interface{}) {}
 
+type Filterable = vocab.LinkOrIRI
+
 // New returns a new repo repository
 func New(c Config) (*repo, error) {
 	p, err := Path(c)
@@ -76,7 +77,7 @@ func loadItem(raw []byte) (vocab.Item, error) {
 	return decodeItemFn(raw)
 }
 
-func (r *repo) loadItem(b *bolt.Bucket, key []byte, f processing.Filterable) (vocab.Item, error) {
+func (r *repo) loadItem(b *bolt.Bucket, key []byte, f Filterable) (vocab.Item, error) {
 	// we have found an item
 	if len(key) == 0 {
 		key = []byte(objectKey)
@@ -120,13 +121,13 @@ func (r *repo) loadItem(b *bolt.Bucket, key []byte, f processing.Filterable) (vo
 	return it, nil
 }
 
-func loadFilteredPropsForActor(r *repo, f processing.Filterable) func(a *vocab.Actor) error {
+func loadFilteredPropsForActor(r *repo, f Filterable) func(a *vocab.Actor) error {
 	return func(a *vocab.Actor) error {
 		return vocab.OnObject(a, loadFilteredPropsForObject(r, f))
 	}
 }
 
-func loadFilteredPropsForObject(r *repo, f processing.Filterable) func(o *vocab.Object) error {
+func loadFilteredPropsForObject(r *repo, f Filterable) func(o *vocab.Object) error {
 	return func(o *vocab.Object) error {
 		if len(o.Tag) == 0 {
 			return nil
@@ -145,7 +146,7 @@ func loadFilteredPropsForObject(r *repo, f processing.Filterable) func(o *vocab.
 	}
 }
 
-func loadFilteredPropsForActivity(r *repo, f processing.Filterable) func(a *vocab.Activity) error {
+func loadFilteredPropsForActivity(r *repo, f Filterable) func(a *vocab.Activity) error {
 	return func(a *vocab.Activity) error {
 		if ok, fo := ap.FiltersOnActivityObject(f); ok && !vocab.IsNil(a.Object) && vocab.IsIRI(a.Object) {
 			if ob, err := r.loadOneFromBucket(a.Object.GetLink()); err == nil {
@@ -158,7 +159,7 @@ func loadFilteredPropsForActivity(r *repo, f processing.Filterable) func(a *voca
 	}
 }
 
-func loadFilteredPropsForIntransitiveActivity(r *repo, f processing.Filterable) func(a *vocab.IntransitiveActivity) error {
+func loadFilteredPropsForIntransitiveActivity(r *repo, f Filterable) func(a *vocab.IntransitiveActivity) error {
 	return func(a *vocab.IntransitiveActivity) error {
 		if ok, fa := ap.FiltersOnActivityActor(f); ok && !vocab.IsNil(a.Actor) && vocab.IsIRI(a.Actor) {
 			if act, err := r.loadOneFromBucket(a.Actor.GetLink()); err == nil {
@@ -178,7 +179,7 @@ func loadFilteredPropsForIntransitiveActivity(r *repo, f processing.Filterable) 
 	}
 }
 
-func (r *repo) loadItemsElements(f processing.Filterable, iris ...vocab.Item) (vocab.ItemCollection, error) {
+func (r *repo) loadItemsElements(f Filterable, iris ...vocab.Item) (vocab.ItemCollection, error) {
 	col := make(vocab.ItemCollection, 0)
 	err := r.d.View(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
@@ -204,7 +205,7 @@ func (r *repo) loadItemsElements(f processing.Filterable, iris ...vocab.Item) (v
 	return col, err
 }
 
-func (r *repo) loadOneFromBucket(f processing.Filterable) (vocab.Item, error) {
+func (r *repo) loadOneFromBucket(f Filterable) (vocab.Item, error) {
 	col, err := r.loadFromBucket(f)
 	if err != nil {
 		return nil, err
@@ -224,7 +225,7 @@ func (r *repo) CreateService(service vocab.Service) error {
 	return createService(r.d, service)
 }
 
-func (r *repo) iterateInBucket(b *bolt.Bucket, f processing.Filterable) (vocab.ItemCollection, uint, error) {
+func (r *repo) iterateInBucket(b *bolt.Bucket, f Filterable) (vocab.ItemCollection, uint, error) {
 	if b == nil {
 		return nil, 0, errors.Errorf("invalid bucket to load from")
 	}
@@ -276,7 +277,7 @@ var ErrorInvalidRoot = func(b []byte) error {
 	return errors.Errorf("Invalid root bucket %s", b)
 }
 
-func (r *repo) loadFromBucket(f processing.Filterable) (vocab.ItemCollection, error) {
+func (r *repo) loadFromBucket(f Filterable) (vocab.ItemCollection, error) {
 	col := make(vocab.ItemCollection, 0)
 	err := r.d.View(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
@@ -322,7 +323,7 @@ func (r *repo) loadFromBucket(f processing.Filterable) (vocab.ItemCollection, er
 				return errors.NotFoundf("not found")
 			}
 			if it.IsCollection() {
-				isColFn := func(ff processing.Filterable) bool {
+				isColFn := func(ff Filterable) bool {
 					_, ok := ff.(vocab.IRI)
 					return ok
 				}
