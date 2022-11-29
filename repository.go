@@ -16,8 +16,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var encodeItemFn = vocab.GobEncode
-var decodeItemFn = vocab.GobDecode
+var encodeItemFn = vocab.MarshalJSON
+var decodeItemFn = vocab.UnmarshalJSON
 
 type repo struct {
 	d     *bolt.DB
