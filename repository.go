@@ -610,11 +610,10 @@ func (r *repo) Save(it vocab.Item) (vocab.Item, error) {
 
 	if it, err = save(r, it); err == nil {
 		op := "Updated"
-		id := it.GetID()
-		if !id.IsValid() {
+		if id := it.GetID(); !id.IsValid() {
 			op = "Added new"
 		}
-		r.logFn("%s %s: %s", op, it.GetType(), it.GetLink())
+		r.logFn("%s %s", op, it.GetLink())
 	}
 
 	return it, err
@@ -705,9 +704,10 @@ func isStorageCollectionKey(lst vocab.CollectionPath) bool {
 	return ap.FedBOXCollections.Contains(lst) || vocab.OfActor.Contains(lst) || vocab.OfObject.Contains(lst)
 }
 
+var allStorageCollections = append(vocab.ActivityPubCollections, ap.FedBOXCollections...)
+
 func addCollectionOnObject(r *repo, col vocab.IRI) error {
 	var err error
-	allStorageCollections := append(vocab.ActivityPubCollections, ap.FedBOXCollections...)
 	if ob, t := allStorageCollections.Split(col); vocab.ValidCollection(t) {
 		// Create the collection on the object, if it doesn't exist
 		i, _ := r.loadOneFromBucket(ob)
