@@ -3,8 +3,8 @@ module github.com/go-ap/storage-boltdb
 go 1.18
 
 require (
-	github.com/go-ap/activitypub v0.0.0-20221205033012-80bb22c4b3ee
-	github.com/go-ap/errors v0.0.0-20221201010224-09b9c5d09ea9
+	github.com/go-ap/activitypub v0.0.0-20221205051756-24cd0c1e821c
+	github.com/go-ap/errors v0.0.0-20221205040414-01c1adfc98ea
 	github.com/go-ap/fedbox v0.0.0-20221120045022-07cf64331c4c
 	github.com/openshift/osin v1.0.1
 	go.etcd.io/bbolt v1.3.6
