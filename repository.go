@@ -10,8 +10,8 @@ import (
 
 	vocab "github.com/go-ap/activitypub"
 	"github.com/go-ap/errors"
-	ap "github.com/go-ap/fedbox/activitypub"
-	"github.com/go-ap/fedbox/storage"
+	"github.com/go-ap/filters"
+	"github.com/go-ap/processing"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -31,9 +31,9 @@ type loggerFn func(string, ...interface{})
 
 const (
 	rootBucket       = ":"
-	bucketActors     = ap.ActorsType
-	bucketActivities = ap.ActivitiesType
-	bucketObjects    = ap.ObjectsType
+	bucketActors     = filters.ActorsType
+	bucketActivities = filters.ActivitiesType
+	bucketObjects    = filters.ObjectsType
 )
 
 // Config
@@ -107,7 +107,7 @@ func (r *repo) loadItem(b *bolt.Bucket, key []byte, f Filterable) (vocab.Item, e
 		vocab.OnActivity(it, loadFilteredPropsForActivity(r, f))
 	}
 	if f != nil {
-		return ap.FilterIt(it, f)
+		return filters.FilterIt(it, f)
 	}
 	return it, nil
 }
@@ -139,9 +139,9 @@ func loadFilteredPropsForObject(r *repo, f Filterable) func(o *vocab.Object) err
 
 func loadFilteredPropsForActivity(r *repo, f Filterable) func(a *vocab.Activity) error {
 	return func(a *vocab.Activity) error {
-		if ok, fo := ap.FiltersOnActivityObject(f); ok && !vocab.IsNil(a.Object) && vocab.IsIRI(a.Object) {
+		if ok, fo := filters.FiltersOnActivityObject(f); ok && !vocab.IsNil(a.Object) && vocab.IsIRI(a.Object) {
 			if ob, err := r.loadOneFromBucket(a.Object.GetLink()); err == nil {
-				if ob, _ = ap.FilterIt(ob, fo); ob != nil {
+				if ob, _ = filters.FilterIt(ob, fo); ob != nil {
 					a.Object = ob
 				}
 			}
@@ -152,16 +152,16 @@ func loadFilteredPropsForActivity(r *repo, f Filterable) func(a *vocab.Activity)
 
 func loadFilteredPropsForIntransitiveActivity(r *repo, f Filterable) func(a *vocab.IntransitiveActivity) error {
 	return func(a *vocab.IntransitiveActivity) error {
-		if ok, fa := ap.FiltersOnActivityActor(f); ok && !vocab.IsNil(a.Actor) && vocab.IsIRI(a.Actor) {
+		if ok, fa := filters.FiltersOnActivityActor(f); ok && !vocab.IsNil(a.Actor) && vocab.IsIRI(a.Actor) {
 			if act, err := r.loadOneFromBucket(a.Actor.GetLink()); err == nil {
-				if act, _ = ap.FilterIt(act, fa); act != nil {
+				if act, _ = filters.FilterIt(act, fa); act != nil {
 					a.Actor = act
 				}
 			}
 		}
-		if ok, ft := ap.FiltersOnActivityTarget(f); ok && !vocab.IsNil(a.Target) && vocab.IsIRI(a.Target) {
+		if ok, ft := filters.FiltersOnActivityTarget(f); ok && !vocab.IsNil(a.Target) && vocab.IsIRI(a.Target) {
 			if t, err := r.loadOneFromBucket(a.Target.GetLink()); err == nil {
-				if t, _ = ap.FilterIt(t, ft); t != nil {
+				if t, _ = filters.FilterIt(t, ft); t != nil {
 					a.Target = t
 				}
 			}
@@ -207,7 +207,38 @@ func (r *repo) loadOneFromBucket(f Filterable) (vocab.Item, error) {
 	return col.First(), nil
 }
 
-func (r *repo) CreateService(service vocab.Service) error {
+func createService(b *bolt.DB, service *vocab.Service) error {
+	raw, err := encodeItemFn(service)
+	if err != nil {
+		return errors.Annotatef(err, "could not marshal service")
+	}
+	return b.Update(func(tx *bolt.Tx) error {
+		root, err := tx.CreateBucketIfNotExists([]byte(rootBucket))
+		if err != nil {
+			return errors.Annotatef(err, "could not create root bucket")
+		}
+		path := itemBucketPath(service.GetLink())
+		hostBucket, _, err := descendInBucket(root, path, true)
+		if err != nil {
+			return errors.Annotatef(err, "could not create %s bucket", path)
+		}
+		if err := hostBucket.Put([]byte(objectKey), raw); err != nil {
+			return errors.Annotatef(err, "could not save %s[%s]", service.Name, service.Type)
+		}
+		if _, err := hostBucket.CreateBucketIfNotExists([]byte(bucketActivities)); err != nil {
+			return errors.Annotatef(err, "could not create %s bucket", bucketActivities)
+		}
+		if _, err := hostBucket.CreateBucketIfNotExists([]byte(bucketActors)); err != nil {
+			return errors.Annotatef(err, "could not create %s bucket", bucketActors)
+		}
+		if _, err := hostBucket.CreateBucketIfNotExists([]byte(bucketObjects)); err != nil {
+			return errors.Annotatef(err, "could not create %s bucket", bucketObjects)
+		}
+		return nil
+	})
+}
+
+func (r *repo) CreateService(service *vocab.Service) error {
 	var err error
 	if err = r.Open(); err != nil {
 		return err
@@ -344,7 +375,7 @@ func (r *repo) Load(i vocab.IRI) (vocab.Item, error) {
 	}
 	defer r.Close()
 
-	f, err := ap.FiltersFromIRI(i)
+	f, err := filters.FiltersFromIRI(i)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +423,7 @@ func descendInBucket(root *bolt.Bucket, path []byte, create bool) (*bolt.Bucket,
 	}
 	remBuckets := bucketNames[lvl:]
 	path = bytes.Join(remBuckets, pathSeparator)
-	if len(remBuckets) > 0 && !ap.HiddenCollections.Contains(vocab.CollectionPath(path)) {
+	if len(remBuckets) > 0 && !filters.HiddenCollections.Contains(vocab.CollectionPath(path)) {
 		return b, path, errors.NotFoundf("%s not found", remBuckets[0])
 	}
 	return b, path, nil
@@ -701,10 +732,10 @@ func (r *repo) RemoveFrom(col vocab.IRI, it vocab.Item) error {
 }
 
 func isStorageCollectionKey(lst vocab.CollectionPath) bool {
-	return ap.FedBOXCollections.Contains(lst) || vocab.OfActor.Contains(lst) || vocab.OfObject.Contains(lst)
+	return filters.FedBOXCollections.Contains(lst) || vocab.OfActor.Contains(lst) || vocab.OfObject.Contains(lst)
 }
 
-var allStorageCollections = append(vocab.ActivityPubCollections, ap.FedBOXCollections...)
+var allStorageCollections = append(vocab.ActivityPubCollections, filters.FedBOXCollections...)
 
 func addCollectionOnObject(r *repo, col vocab.IRI) error {
 	var err error
@@ -795,7 +826,7 @@ func (r *repo) PasswordSet(it vocab.Item, pw []byte) error {
 		if err != nil {
 			return errors.Annotatef(err, "Could not encrypt the pw")
 		}
-		m := storage.Metadata{
+		m := processing.Metadata{
 			Pw: pw,
 		}
 		entryBytes, err := encodeFn(m)
@@ -821,7 +852,7 @@ func (r *repo) PasswordCheck(it vocab.Item, pw []byte) error {
 	}
 	defer r.Close()
 
-	m := storage.Metadata{}
+	m := processing.Metadata{}
 	err = r.d.View(func(tx *bolt.Tx) error {
 		root := tx.Bucket(r.root)
 		if root == nil {
@@ -846,7 +877,7 @@ func (r *repo) PasswordCheck(it vocab.Item, pw []byte) error {
 }
 
 // LoadMetadata
-func (r *repo) LoadMetadata(iri vocab.IRI) (*storage.Metadata, error) {
+func (r *repo) LoadMetadata(iri vocab.IRI) (*processing.Metadata, error) {
 	err := r.Open()
 	if err != nil {
 		return nil, err
@@ -854,7 +885,7 @@ func (r *repo) LoadMetadata(iri vocab.IRI) (*storage.Metadata, error) {
 	defer r.Close()
 	path := itemBucketPath(iri)
 
-	var m *storage.Metadata
+	var m *processing.Metadata
 	err = r.d.View(func(tx *bolt.Tx) error {
 		root := tx.Bucket(r.root)
 		if root == nil {
@@ -866,14 +897,14 @@ func (r *repo) LoadMetadata(iri vocab.IRI) (*storage.Metadata, error) {
 			return errors.Newf("Unable to find %s in root bucket", path)
 		}
 		entryBytes := b.Get([]byte(metaDataKey))
-		m = new(storage.Metadata)
+		m = new(processing.Metadata)
 		return decodeFn(entryBytes, m)
 	})
 	return m, err
 }
 
 // SaveMetadata
-func (r *repo) SaveMetadata(m storage.Metadata, iri vocab.IRI) error {
+func (r *repo) SaveMetadata(m processing.Metadata, iri vocab.IRI) error {
 	err := r.Open()
 	if err != nil {
 		return err

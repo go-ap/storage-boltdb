@@ -11,10 +11,9 @@ import (
 func TestBootstrap(t *testing.T) {
 	dir := t.TempDir()
 	bucket := []byte(rootBucket)
-	url := "random-string-not-an-URL"
 	conf := Config{Path: dir}
 	path, _ := Path(Config{Path: dir})
-	err := Bootstrap(conf, url)
+	err := Bootstrap(conf, nil)
 	if err != nil {
 		t.Errorf("Error received when cleaning valid boltdb %s with valid root bucket %s: %s", path, bucket, err)
 	}

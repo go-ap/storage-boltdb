@@ -3,32 +3,21 @@ package boltdb
 import (
 	vocab "github.com/go-ap/activitypub"
 	"github.com/go-ap/errors"
-	ap "github.com/go-ap/fedbox/activitypub"
 	bolt "go.etcd.io/bbolt"
 )
 
-func Bootstrap(conf Config, url string) error {
+func Bootstrap(conf Config, self vocab.Item) error {
 	r, err := New(conf)
 	if err != nil {
 		return err
 	}
 
-	self := ap.Self(ap.DefaultServiceIRI(url))
-	actors := &vocab.OrderedCollection{ID: ap.ActorsType.IRI(&self)}
-	activities := &vocab.OrderedCollection{ID: ap.ActivitiesType.IRI(&self)}
-	objects := &vocab.OrderedCollection{ID: ap.ObjectsType.IRI(&self)}
-	if _, err = r.Create(actors); err != nil {
+	db, err := bolt.Open(r.path, 0600, nil)
+	if err != nil {
 		return err
 	}
-	if _, err = r.Create(activities); err != nil {
-		return err
-	}
-	if _, err = r.Create(objects); err != nil {
-		return err
-	}
-	db, _ := bolt.Open(r.path, 0600, nil)
 	defer db.Close()
-	return db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists(r.root)
 		if err != nil {
 			return errors.Annotatef(err, "could not create root bucket")
@@ -51,37 +40,10 @@ func Bootstrap(conf Config, url string) error {
 		}
 		return nil
 	})
-}
-
-func createService(b *bolt.DB, service vocab.Service) error {
-	raw, err := encodeItemFn(service)
 	if err != nil {
-		return errors.Annotatef(err, "could not marshal service")
+		return err
 	}
-	return b.Update(func(tx *bolt.Tx) error {
-		root, err := tx.CreateBucketIfNotExists([]byte(rootBucket))
-		if err != nil {
-			return errors.Annotatef(err, "could not create root bucket")
-		}
-		path := itemBucketPath(service.GetLink())
-		hostBucket, _, err := descendInBucket(root, path, true)
-		if err != nil {
-			return errors.Annotatef(err, "could not create %s bucket", path)
-		}
-		if err := hostBucket.Put([]byte(objectKey), raw); err != nil {
-			return errors.Annotatef(err, "could not save %s[%s]", service.Name, service.Type)
-		}
-		if _, err := hostBucket.CreateBucketIfNotExists([]byte(bucketActivities)); err != nil {
-			return errors.Annotatef(err, "could not create %s bucket", bucketActivities)
-		}
-		if _, err := hostBucket.CreateBucketIfNotExists([]byte(bucketActors)); err != nil {
-			return errors.Annotatef(err, "could not create %s bucket", bucketActors)
-		}
-		if _, err := hostBucket.CreateBucketIfNotExists([]byte(bucketObjects)); err != nil {
-			return errors.Annotatef(err, "could not create %s bucket", bucketObjects)
-		}
-		return nil
-	})
+	return vocab.OnActor(self, r.CreateService)
 }
 
 func Clean(conf Config) error {

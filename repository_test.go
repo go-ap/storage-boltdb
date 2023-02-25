@@ -34,10 +34,9 @@ func TestNew(t *testing.T) {
 
 func TestRepo_Open(t *testing.T) {
 	dir := os.TempDir()
-	url := "random-string-not-an-URL"
 	conf := Config{Path: dir}
 	path, _ := Path(conf)
-	err := Bootstrap(conf, url)
+	err := Bootstrap(conf, nil)
 	if err != nil {
 		t.Errorf("Unable to bootstrap boltdb %s: %s", path, err)
 	}
@@ -57,12 +56,11 @@ func TestRepo_Open(t *testing.T) {
 
 func TestRepo_Close(t *testing.T) {
 	dir := os.TempDir()
-	url := "random-string-not-an-URL"
 	conf := Config{
 		Path: dir,
 	}
 	path, _ := Path(conf)
-	err := Bootstrap(conf, url)
+	err := Bootstrap(conf, nil)
 	if err != nil {
 		t.Errorf("Unable to bootstrap boltdb %s: %s", path, err)
 	}
