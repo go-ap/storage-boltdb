@@ -43,7 +43,9 @@ func Bootstrap(conf Config, self vocab.Item) error {
 	if err != nil {
 		return err
 	}
-	return vocab.OnActor(self, r.CreateService)
+	return vocab.OnActor(self, func(service *vocab.Actor) error {
+		return createService(db, service)
+	})
 }
 
 func Clean(conf Config) error {
