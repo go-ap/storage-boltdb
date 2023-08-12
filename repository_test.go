@@ -36,7 +36,7 @@ func TestRepo_Open(t *testing.T) {
 	dir := os.TempDir()
 	conf := Config{Path: dir}
 	path, _ := Path(conf)
-	err := Bootstrap(conf, nil)
+	err := Bootstrap(conf)
 	if err != nil {
 		t.Errorf("Unable to bootstrap boltdb %s: %s", path, err)
 	}
@@ -60,7 +60,7 @@ func TestRepo_Close(t *testing.T) {
 		Path: dir,
 	}
 	path, _ := Path(conf)
-	err := Bootstrap(conf, nil)
+	err := Bootstrap(conf)
 	if err != nil {
 		t.Errorf("Unable to bootstrap boltdb %s: %s", path, err)
 	}

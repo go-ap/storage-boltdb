@@ -243,15 +243,6 @@ func createService(b *bolt.DB, service *vocab.Service) error {
 	})
 }
 
-func (r *repo) CreateService(service *vocab.Service) error {
-	var err error
-	if err = r.Open(); err != nil {
-		return err
-	}
-	defer r.Close()
-	return createService(r.d, service)
-}
-
 func (r *repo) iterateInBucket(b *bolt.Bucket, f Filterable) (vocab.ItemCollection, uint, error) {
 	if b == nil {
 		return nil, 0, errors.Errorf("invalid bucket to load from")

@@ -1,12 +1,11 @@
 package boltdb
 
 import (
-	vocab "github.com/go-ap/activitypub"
 	"github.com/go-ap/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
-func Bootstrap(conf Config, self vocab.Item) error {
+func Bootstrap(conf Config) error {
 	r, err := New(conf)
 	if err != nil {
 		return err
@@ -17,7 +16,7 @@ func Bootstrap(conf Config, self vocab.Item) error {
 		return err
 	}
 	defer db.Close()
-	err = db.Update(func(tx *bolt.Tx) error {
+	return db.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists(r.root)
 		if err != nil {
 			return errors.Annotatef(err, "could not create root bucket")
@@ -39,12 +38,6 @@ func Bootstrap(conf Config, self vocab.Item) error {
 			return errors.Annotatef(err, "could not create %s bucket", clientsBucket)
 		}
 		return nil
-	})
-	if err != nil {
-		return err
-	}
-	return vocab.OnActor(self, func(service *vocab.Actor) error {
-		return createService(db, service)
 	})
 }
 

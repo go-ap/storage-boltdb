@@ -13,7 +13,7 @@ func TestBootstrap(t *testing.T) {
 	bucket := []byte(rootBucket)
 	conf := Config{Path: dir}
 	path, _ := Path(Config{Path: dir})
-	err := Bootstrap(conf, nil)
+	err := Bootstrap(conf)
 	if err != nil {
 		t.Errorf("Error received when cleaning valid boltdb %s with valid root bucket %s: %s", path, bucket, err)
 	}
