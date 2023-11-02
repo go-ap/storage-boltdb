@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/go-ap/activitypub v0.0.0-20231030184441-9f208f3d7c66
 	github.com/go-ap/errors v0.0.0-20231003111023-183eef4b31b7
-	github.com/go-ap/filters v0.0.0-20231031181623-f947c75704c7
+	github.com/go-ap/filters v0.0.0-20231103210231-984efe274c53
 	github.com/go-ap/processing v0.0.0-20231031181732-4319277d9b5b
 	github.com/openshift/osin v1.0.1
 	go.etcd.io/bbolt v1.3.7
