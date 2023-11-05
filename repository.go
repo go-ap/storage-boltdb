@@ -365,7 +365,7 @@ func (r *repo) loadFromBucket(f Filterable) (vocab.ItemCollection, error) {
 }
 
 // Load
-func (r *repo) Load(i vocab.IRI, _ ...filters.Fn) (vocab.Item, error) {
+func (r *repo) Load(i vocab.IRI, _ ...filters.Check) (vocab.Item, error) {
 	if err := r.Open(); err != nil {
 		return nil, err
 	}
