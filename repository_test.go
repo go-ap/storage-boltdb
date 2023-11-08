@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	vocab "github.com/go-ap/activitypub"
-	bolt "go.etcd.io/bbolt"
 )
 
 func TestNew(t *testing.T) {
@@ -86,29 +85,12 @@ func TestRepo_Load(t *testing.T) {
 }
 
 func initBoltDBForTesting(t *testing.T) (*repo, error) {
-	tempDir, err := Path(Config{Path: t.TempDir()})
+	c := Config{Path: t.TempDir()}
+	Bootstrap(c)
+	r, err := New(c)
 	if err != nil {
-		return nil, fmt.Errorf("invalid path for initializing boltdb %s: %s", tempDir, err)
+		return nil, fmt.Errorf("invalid path for initializing boltdb %s: %s", c.Path, err)
 	}
-	r := &repo{
-		root:  []byte(rootBucket),
-		path:  tempDir,
-		logFn: t.Logf,
-		errFn: t.Errorf,
-	}
-	r.d, err = bolt.Open(tempDir, 0600, nil)
-	defer r.d.Close()
-	if err != nil {
-		return nil, fmt.Errorf("failed to open boltdb database at path %s: %s", tempDir, err)
-	}
-	err = r.d.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(rootBucket))
-		return err
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create boltdb root bucket %s: %s", r.path, err)
-	}
-
 	t.Logf("Initialized test db at %s", r.path)
 	return r, nil
 }
@@ -173,8 +155,11 @@ func Test_repo_AddTo(t *testing.T) {
 			if err != nil {
 				t.Errorf("unable to load %s: %s", tt.args.col, err)
 			}
+			if !res.IsCollection() {
+				t.Errorf("Received response is not a collection: %v", res)
+			}
 			for _, expected := range tt.args.it {
-				err := vocab.OnCollectionIntf(res, func(col vocab.CollectionInterface) error {
+				err = vocab.OnCollectionIntf(res, func(col vocab.CollectionInterface) error {
 					if col.Contains(expected) {
 						return nil
 					}
