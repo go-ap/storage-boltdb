@@ -3,13 +3,13 @@ module github.com/go-ap/storage-boltdb
 go 1.18
 
 require (
-	github.com/go-ap/activitypub v0.0.0-20240211124657-820024a66b78
-	github.com/go-ap/errors v0.0.0-20231003111023-183eef4b31b7
-	github.com/go-ap/filters v0.0.0-20240211125015-2de118fbc889
-	github.com/go-ap/processing v0.0.0-20240219170415-0288cef1f678
+	github.com/go-ap/activitypub v0.0.0-20240304122919-ef7a45e2d04a
+	github.com/go-ap/errors v0.0.0-20240304112515-6077fa9c17b0
+	github.com/go-ap/filters v0.0.0-20240304123324-2c49f9d9a5e3
+	github.com/go-ap/processing v0.0.0-20240304123656-97b0484ccb3c
 	github.com/openshift/osin v1.0.1
 	go.etcd.io/bbolt v1.3.7
-	golang.org/x/crypto v0.19.0
+	golang.org/x/crypto v0.20.0
 )
 
 require (
