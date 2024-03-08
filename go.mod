@@ -6,9 +6,9 @@ require (
 	github.com/go-ap/activitypub v0.0.0-20240304122919-ef7a45e2d04a
 	github.com/go-ap/errors v0.0.0-20240304112515-6077fa9c17b0
 	github.com/go-ap/filters v0.0.0-20240308123440-369d4a67f42d
-	github.com/go-ap/processing v0.0.0-20240308123728-8c00bd3dda9d
+	github.com/go-ap/processing v0.0.0-20240308130546-81e459b25741
 	github.com/openshift/osin v1.0.1
-	go.etcd.io/bbolt v1.3.7
+	go.etcd.io/bbolt v1.3.9
 	golang.org/x/crypto v0.21.0
 )
 
