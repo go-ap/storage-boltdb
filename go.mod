@@ -5,8 +5,8 @@ go 1.18
 require (
 	github.com/go-ap/activitypub v0.0.0-20240324143732-70ec96f244e6
 	github.com/go-ap/errors v0.0.0-20240304112515-6077fa9c17b0
-	github.com/go-ap/filters v0.0.0-20240324144020-fa2c80e401ec
-	github.com/go-ap/processing v0.0.0-20240324144257-a1df6e3b6bdf
+	github.com/go-ap/filters v0.0.0-20240325123954-6b5f402749f3
+	github.com/go-ap/processing v0.0.0-20240325125404-cc52c350c92e
 	github.com/openshift/osin v1.0.1
 	go.etcd.io/bbolt v1.3.9
 	golang.org/x/crypto v0.21.0
