@@ -7,8 +7,8 @@ toolchain go1.23.0
 require (
 	github.com/go-ap/activitypub v0.0.0-20240910141749-b4b8c8aa484c
 	github.com/go-ap/errors v0.0.0-20240910140019-1e9d33cc1568
-	github.com/go-ap/filters v0.0.0-20240910141936-c8f68cdf2bc9
-	github.com/go-ap/processing v0.0.0-20240910151355-8284a5ce9c22
+	github.com/go-ap/filters v0.0.0-20240929110425-9d328f7c1fbd
+	github.com/go-ap/processing v0.0.0-20240929113045-72b22ec64f38
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.3.11
 	golang.org/x/crypto v0.27.0
