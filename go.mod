@@ -1,14 +1,14 @@
 module github.com/go-ap/storage-boltdb
 
-go 1.22
+go 1.23
 
-toolchain go1.23.0
+toolchain go1.23.2
 
 require (
 	github.com/go-ap/activitypub v0.0.0-20240910141749-b4b8c8aa484c
 	github.com/go-ap/errors v0.0.0-20240910140019-1e9d33cc1568
 	github.com/go-ap/filters v0.0.0-20241027120602-54d8e1989499
-	github.com/go-ap/processing v0.0.0-20241027121013-a4e9ac30f26e
+	github.com/go-ap/processing v0.0.0-20241027124317-ec1ffe74c70f
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.3.11
 	golang.org/x/crypto v0.28.0
