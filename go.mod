@@ -5,8 +5,8 @@ go 1.23
 require (
 	github.com/go-ap/activitypub v0.0.0-20241114170014-e897df079e3d
 	github.com/go-ap/errors v0.0.0-20240910140019-1e9d33cc1568
-	github.com/go-ap/filters v0.0.0-20241115220408-6e0dd28b6a9a
-	github.com/go-ap/processing v0.0.0-20241115220824-75455c106119
+	github.com/go-ap/filters v0.0.0-20241116100812-7fd60f23761e
+	github.com/go-ap/processing v0.0.0-20241116101014-acf5770bece8
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.3.11
 	golang.org/x/crypto v0.29.0
