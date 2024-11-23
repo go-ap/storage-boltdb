@@ -3,10 +3,10 @@ module github.com/go-ap/storage-boltdb
 go 1.23
 
 require (
-	github.com/go-ap/activitypub v0.0.0-20241114170014-e897df079e3d
+	github.com/go-ap/activitypub v0.0.0-20241123145931-b72f8292c65b
 	github.com/go-ap/errors v0.0.0-20240910140019-1e9d33cc1568
-	github.com/go-ap/filters v0.0.0-20241123113339-f44dc6471d02
-	github.com/go-ap/processing v0.0.0-20241123113930-55367c4e5430
+	github.com/go-ap/filters v0.0.0-20241123150434-f4a4d8488079
+	github.com/go-ap/processing v0.0.0-20241123150633-1454b6bf02f0
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.3.11
 	golang.org/x/crypto v0.29.0
@@ -20,7 +20,7 @@ require (
 	git.sr.ht/~mariusor/ssm v0.0.0-20240811085540-34f24cac52b7 // indirect
 	github.com/RoaringBitmap/roaring v1.9.4 // indirect
 	github.com/bits-and-blooms/bitset v1.16.0 // indirect
-	github.com/go-ap/client v0.0.0-20241114180623-d0658a04422c // indirect
+	github.com/go-ap/client v0.0.0-20241123150455-030e6d4f1054 // indirect
 	github.com/go-ap/jsonld v0.0.0-20221030091449-f2a191312c73 // indirect
 	github.com/go-chi/chi/v5 v5.1.0 // indirect
 	github.com/go-fed/httpsig v1.1.0 // indirect
