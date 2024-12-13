@@ -498,7 +498,7 @@ func createCollectionsInBucket(b *bolt.Bucket, it vocab.Item) error {
 	}
 	// create collections
 	if vocab.ActorTypes.Contains(it.GetType()) {
-		vocab.OnActor(it, func(p *vocab.Actor) error {
+		_ = vocab.OnActor(it, func(p *vocab.Actor) error {
 			if p.Inbox != nil {
 				p.Inbox, _ = createCollectionInBucket(b, vocab.Inbox.IRI(p))
 			}
@@ -509,7 +509,7 @@ func createCollectionsInBucket(b *bolt.Bucket, it vocab.Item) error {
 				p.Followers, _ = createCollectionInBucket(b, vocab.Followers.IRI(p))
 			}
 			if p.Following != nil {
-				p.Following, _ = createCollectionInBucket(b, vocab.Liked.IRI(p))
+				p.Following, _ = createCollectionInBucket(b, vocab.Following.IRI(p))
 			}
 			if p.Liked != nil {
 				p.Liked, _ = createCollectionInBucket(b, vocab.Liked.IRI(p))
