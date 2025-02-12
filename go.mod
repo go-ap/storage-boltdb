@@ -3,13 +3,13 @@ module github.com/go-ap/storage-boltdb
 go 1.23
 
 require (
-	github.com/go-ap/activitypub v0.0.0-20250124194921-d52b4c694e14
+	github.com/go-ap/activitypub v0.0.0-20250212090640-aeb6499ba581
 	github.com/go-ap/errors v0.0.0-20250124135319-3da8adefd4a9
-	github.com/go-ap/filters v0.0.0-20250128143727-4cb9a9d7db48
-	github.com/go-ap/processing v0.0.0-20250131093610-01a9626bd2b9
+	github.com/go-ap/filters v0.0.0-20250212093317-ca1dc66cad4e
+	github.com/go-ap/processing v0.0.0-20250213142423-9ac245433c76
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
-	go.etcd.io/bbolt v1.3.11
-	golang.org/x/crypto v0.32.0
+	go.etcd.io/bbolt v1.4.0
+	golang.org/x/crypto v0.33.0
 )
 
 require (
@@ -20,9 +20,9 @@ require (
 	git.sr.ht/~mariusor/ssm v0.0.0-20241220163816-32d18afe7b22 // indirect
 	github.com/RoaringBitmap/roaring v1.9.4 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
-	github.com/go-ap/client v0.0.0-20250131093345-c5680a9e664b // indirect
+	github.com/go-ap/client v0.0.0-20250212093435-5abaf05c43c3 // indirect
 	github.com/go-ap/jsonld v0.0.0-20221030091449-f2a191312c73 // indirect
-	github.com/go-chi/chi/v5 v5.2.0 // indirect
+	github.com/go-chi/chi/v5 v5.2.1 // indirect
 	github.com/go-fed/httpsig v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jdkato/prose v1.2.1 // indirect
@@ -35,8 +35,8 @@ require (
 	github.com/rs/zerolog v1.33.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
-	golang.org/x/oauth2 v0.25.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/oauth2 v0.26.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	gopkg.in/neurosnap/sentences.v1 v1.0.7 // indirect
 )
