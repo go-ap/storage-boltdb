@@ -212,8 +212,12 @@ func (r *repo) loadOneFromBucket(iri vocab.IRI) (vocab.Item, error) {
 		it = c.Collection().First()
 		return nil
 	})
+
 	return it, err
 }
+
+var orderedCollectionTypes = vocab.ActivityVocabularyTypes{vocab.OrderedCollectionPageType, vocab.OrderedCollectionType}
+var collectionTypes = vocab.ActivityVocabularyTypes{vocab.CollectionPageType, vocab.CollectionType}
 
 func (r *repo) iterateInBucket(b *bolt.Bucket, iri vocab.IRI) (vocab.Item, uint, error) {
 	if b == nil {
@@ -265,11 +269,12 @@ func (r *repo) iterateInBucket(b *bolt.Bucket, iri vocab.IRI) (vocab.Item, uint,
 			_ = items.Append(it)
 		}
 	}
-	err = vocab.OnOrderedCollection(col, func(c *vocab.OrderedCollection) error {
-		c.TotalItems = uint(len(items))
-		c.OrderedItems = items
-		return nil
-	})
+
+	if orderedCollectionTypes.Contains(col.GetType()) {
+		err = vocab.OnOrderedCollection(col, buildOrderedCollection(items))
+	} else {
+		err = vocab.OnCollection(col, buildCollection(items))
+	}
 	return col, uint(len(items)), err
 }
 
@@ -439,11 +444,15 @@ func itemBucketPath(iri vocab.IRI) []byte {
 	return []byte(url.Host + url.Path)
 }
 
-func createCollection(b *bolt.Bucket, colIRI vocab.IRI) (vocab.CollectionInterface, error) {
+func createCollection(b *bolt.Bucket, colIRI vocab.IRI, owner vocab.Item) (vocab.CollectionInterface, error) {
 	col := vocab.OrderedCollection{
 		ID:        colIRI,
 		Type:      vocab.OrderedCollectionType,
+		CC:        vocab.ItemCollection{vocab.PublicNS},
 		Published: time.Now().UTC(),
+	}
+	if !vocab.IsNil(owner) {
+		col.AttributedTo = owner.GetLink()
 	}
 	return saveCollection(b, &col)
 }
@@ -460,18 +469,18 @@ func saveCollection(b *bolt.Bucket, col vocab.CollectionInterface) (vocab.Collec
 	return col, err
 }
 
-func saveNewCollection(it vocab.Item, b *bolt.Bucket) (vocab.Item, error) {
+func saveNewCollection(it vocab.Item, b *bolt.Bucket, owner vocab.Item) (vocab.Item, error) {
 	colObject, err := loadRawItemFromBucket(b)
 	if err != nil && !errors.IsNotFound(err) {
 		return nil, err
 	}
 	if colObject == nil {
-		it, err = createCollection(b, it.GetLink())
+		it, err = createCollection(b, it.GetLink(), owner)
 	}
 	return it.GetLink(), nil
 }
 
-func createCollectionInBucket(parent *bolt.Bucket, it vocab.Item) (vocab.Item, error) {
+func createCollectionInBucket(parent *bolt.Bucket, it vocab.Item, owner vocab.Item) (vocab.Item, error) {
 	if vocab.IsNil(it) {
 		return nil, nil
 	}
@@ -482,7 +491,7 @@ func createCollectionInBucket(parent *bolt.Bucket, it vocab.Item) (vocab.Item, e
 		return nil, err
 	}
 
-	return saveNewCollection(it, b)
+	return saveNewCollection(it, b, owner)
 }
 
 func deleteBucket(b *bolt.Bucket, it vocab.Item) error {
@@ -501,32 +510,32 @@ func createCollectionsInBucket(b *bolt.Bucket, it vocab.Item) error {
 	if vocab.ActorTypes.Contains(it.GetType()) {
 		_ = vocab.OnActor(it, func(p *vocab.Actor) error {
 			if p.Inbox != nil {
-				p.Inbox, _ = createCollectionInBucket(b, vocab.Inbox.IRI(p))
+				p.Inbox, _ = createCollectionInBucket(b, vocab.Inbox.IRI(p), p)
 			}
 			if p.Outbox != nil {
-				p.Outbox, _ = createCollectionInBucket(b, vocab.Outbox.IRI(p))
+				p.Outbox, _ = createCollectionInBucket(b, vocab.Outbox.IRI(p), p)
 			}
 			if p.Followers != nil {
-				p.Followers, _ = createCollectionInBucket(b, vocab.Followers.IRI(p))
+				p.Followers, _ = createCollectionInBucket(b, vocab.Followers.IRI(p), p)
 			}
 			if p.Following != nil {
-				p.Following, _ = createCollectionInBucket(b, vocab.Following.IRI(p))
+				p.Following, _ = createCollectionInBucket(b, vocab.Following.IRI(p), p)
 			}
 			if p.Liked != nil {
-				p.Liked, _ = createCollectionInBucket(b, vocab.Liked.IRI(p))
+				p.Liked, _ = createCollectionInBucket(b, vocab.Liked.IRI(p), p)
 			}
 			return nil
 		})
 	}
 	return vocab.OnObject(it, func(o *vocab.Object) error {
 		if o.Replies != nil {
-			o.Replies, _ = createCollectionInBucket(b, vocab.Replies.IRI(o))
+			o.Replies, _ = createCollectionInBucket(b, vocab.Replies.IRI(o), o)
 		}
 		if o.Likes != nil {
-			o.Likes, _ = createCollectionInBucket(b, vocab.Likes.IRI(o))
+			o.Likes, _ = createCollectionInBucket(b, vocab.Likes.IRI(o), o)
 		}
 		if o.Shares != nil {
-			o.Shares, _ = createCollectionInBucket(b, vocab.Shares.IRI(o))
+			o.Shares, _ = createCollectionInBucket(b, vocab.Shares.IRI(o), o)
 		}
 		return nil
 	})
@@ -682,7 +691,7 @@ func (r *repo) RemoveFrom(colIRI vocab.IRI, it vocab.Item) error {
 			return err
 		}
 		if col == nil {
-			col, err = createCollection(b, colIRI)
+			col, err = createCollection(b, colIRI, nil)
 			if err != nil {
 				return err
 			}
@@ -695,16 +704,32 @@ func (r *repo) RemoveFrom(colIRI vocab.IRI, it vocab.Item) error {
 					items.Append(iri.GetLink())
 				}
 			}
-			c.TotalItems = uint(len(items))
+			c.TotalItems -= 1
 			c.OrderedItems = items
 			return nil
 		})
 		if err != nil {
 			return err
 		}
-		_, err = saveNewCollection(col, b)
+		_, err = saveNewCollection(col, b, nil)
 		return err
 	})
+}
+
+func buildCollection(items vocab.ItemCollection) vocab.WithCollectionFn {
+	return func(col *vocab.Collection) error {
+		col.Items = items
+		col.TotalItems = uint(len(items))
+		return nil
+	}
+}
+
+func buildOrderedCollection(items vocab.ItemCollection) vocab.WithOrderedCollectionFn {
+	return func(col *vocab.OrderedCollection) error {
+		col.OrderedItems = items
+		col.TotalItems = uint(len(items))
+		return nil
+	}
 }
 
 func iriIsStorageCollection(i vocab.IRI) bool {
@@ -745,7 +770,7 @@ func (r *repo) AddTo(colIRI vocab.IRI, it vocab.Item) error {
 			return err
 		}
 		if col == nil {
-			col, err = createCollection(b, colIRI)
+			col, err = createCollection(b, colIRI, nil)
 			if err != nil {
 				return err
 			}
@@ -754,7 +779,7 @@ func (r *repo) AddTo(colIRI vocab.IRI, it vocab.Item) error {
 		err = vocab.OnOrderedCollection(col, func(c *vocab.OrderedCollection) error {
 			if !c.Contains(it.GetLink()) {
 				c.Append(it.GetLink())
-				c.TotalItems = uint(len(c.OrderedItems))
+				c.TotalItems += 1
 			}
 			return nil
 		})
