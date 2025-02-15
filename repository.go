@@ -15,15 +15,17 @@ import (
 	"time"
 
 	vocab "github.com/go-ap/activitypub"
+	au "github.com/go-ap/auth"
 	"github.com/go-ap/errors"
 	"github.com/go-ap/filters"
-	"github.com/go-ap/processing"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var encodeItemFn = vocab.MarshalJSON
 var decodeItemFn = vocab.UnmarshalJSON
+
+type Metadata = au.Metadata
 
 type repo struct {
 	d     *bolt.DB
@@ -856,7 +858,7 @@ func (r *repo) PasswordSet(it vocab.Item, pw []byte) error {
 		if err != nil {
 			return errors.Annotatef(err, "Could not encrypt the pw")
 		}
-		m := processing.Metadata{
+		m := Metadata{
 			Pw: pw,
 		}
 		entryBytes, err := encodeFn(m)
@@ -882,7 +884,7 @@ func (r *repo) PasswordCheck(it vocab.Item, pw []byte) error {
 	}
 	defer r.Close()
 
-	m := processing.Metadata{}
+	m := Metadata{}
 	err = r.d.View(func(tx *bolt.Tx) error {
 		root := tx.Bucket(r.root)
 		if root == nil {
@@ -907,7 +909,7 @@ func (r *repo) PasswordCheck(it vocab.Item, pw []byte) error {
 }
 
 // LoadMetadata
-func (r *repo) LoadMetadata(iri vocab.IRI) (*processing.Metadata, error) {
+func (r *repo) LoadMetadata(iri vocab.IRI) (*Metadata, error) {
 	err := r.Open()
 	if err != nil {
 		return nil, err
@@ -915,7 +917,7 @@ func (r *repo) LoadMetadata(iri vocab.IRI) (*processing.Metadata, error) {
 	defer r.Close()
 	path := itemBucketPath(iri)
 
-	var m *processing.Metadata
+	var m *Metadata
 	err = r.d.View(func(tx *bolt.Tx) error {
 		root := tx.Bucket(r.root)
 		if root == nil {
@@ -927,14 +929,14 @@ func (r *repo) LoadMetadata(iri vocab.IRI) (*processing.Metadata, error) {
 			return errors.Newf("Unable to find %s in root bucket", path)
 		}
 		entryBytes := b.Get([]byte(metaDataKey))
-		m = new(processing.Metadata)
+		m = new(Metadata)
 		return decodeFn(entryBytes, m)
 	})
 	return m, err
 }
 
 // SaveMetadata
-func (r *repo) SaveMetadata(m processing.Metadata, iri vocab.IRI) error {
+func (r *repo) SaveMetadata(m Metadata, iri vocab.IRI) error {
 	err := r.Open()
 	if err != nil {
 		return err
