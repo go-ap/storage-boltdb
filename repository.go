@@ -1043,6 +1043,9 @@ func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (vocab.Item, error)
 	if err != nil && !errors.IsNotFound(err) {
 		return ob, err
 	}
+	if m == nil {
+		m = new(Metadata)
+	}
 	if m.PrivateKey != nil {
 		r.logFn("actor %s already has a private key", iri)
 	}
