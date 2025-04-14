@@ -281,7 +281,7 @@ func (r *repo) iterateInBucket(b *bolt.Bucket, iri vocab.IRI) (vocab.Item, uint,
 }
 
 var ErrorInvalidRoot = func(b []byte) error {
-	return errors.Errorf("Invalid root bucket %s", b)
+	return errors.NotFoundf("Invalid root bucket %s", b)
 }
 
 func (r *repo) loadFromBucket(iri vocab.IRI) (vocab.Item, error) {
@@ -344,11 +344,6 @@ func (r *repo) loadFromBucket(iri vocab.IRI) (vocab.Item, error) {
 
 // Load
 func (r *repo) Load(i vocab.IRI, fil ...filters.Check) (vocab.Item, error) {
-	if err := r.Open(); err != nil {
-		return nil, err
-	}
-	defer r.Close()
-
 	ret, err := r.loadFromBucket(i)
 	return filters.Checks(fil).Run(ret), err
 }
@@ -417,11 +412,6 @@ func delete(r *repo, it vocab.Item) error {
 // Create
 func (r *repo) Create(col vocab.CollectionInterface) (vocab.CollectionInterface, error) {
 	var err error
-	err = r.Open()
-	if err != nil {
-		return col, err
-	}
-	defer r.Close()
 
 	cPath := itemBucketPath(col.GetLink())
 	err = r.d.Update(func(tx *bolt.Tx) error {
@@ -649,14 +639,8 @@ func save(r *repo, it vocab.Item) (vocab.Item, error) {
 
 // Save
 func (r *repo) Save(it vocab.Item) (vocab.Item, error) {
-	var err error
-	err = r.Open()
-	if err != nil {
-		return it, err
-	}
-	defer r.Close()
-
-	if it, err = save(r, it); err == nil {
+	it, err := save(r, it)
+	if err == nil {
 		op := "Updated"
 		if id := it.GetID(); !id.IsValid() {
 			op = "Added new"
@@ -669,12 +653,6 @@ func (r *repo) Save(it vocab.Item) (vocab.Item, error) {
 
 // RemoveFrom
 func (r *repo) RemoveFrom(colIRI vocab.IRI, it vocab.Item) error {
-	err := r.Open()
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-
 	pathInBucket := itemBucketPath(colIRI.GetLink())
 	return r.d.Update(func(tx *bolt.Tx) error {
 		root, err := rootFromTx(tx, r.root)
@@ -748,12 +726,6 @@ var allStorageCollections = append(vocab.ActivityPubCollections, filters.FedBOXC
 
 // AddTo
 func (r *repo) AddTo(colIRI vocab.IRI, it vocab.Item) error {
-	err := r.Open()
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-
 	pathInBucket := itemBucketPath(colIRI.GetLink())
 	return r.d.Update(func(tx *bolt.Tx) error {
 		root, err := rootFromTx(tx, r.root)
@@ -794,11 +766,6 @@ func (r *repo) AddTo(colIRI vocab.IRI, it vocab.Item) error {
 
 // Delete
 func (r *repo) Delete(it vocab.Item) error {
-	err := r.Open()
-	if err != nil {
-		return err
-	}
-	defer r.Close()
 	return delete(r, it)
 }
 
@@ -807,34 +774,34 @@ func (r *repo) Open() error {
 	if r == nil {
 		return errors.Newf("Unable to open uninitialized db")
 	}
-	var err error
-	r.d, err = bolt.Open(r.path, 0600, nil)
-	if err != nil {
-		return errors.Annotatef(err, "Could not open db %s", r.path)
+	if r.d == nil {
+		var err error
+		r.d, err = bolt.Open(r.path, 0600, nil)
+		if err != nil {
+			return errors.Annotatef(err, "Could not open db %s", r.path)
+		}
 	}
 	return nil
 }
 
 func (r *repo) close() error {
+	fmt.Fprintf(os.Stderr, "Closing boltdb %s[%t]", r.path, r.d != nil)
 	if r == nil {
 		return errors.Newf("Unable to close uninitialized db")
 	}
 	if r.d == nil {
 		return nil
 	}
-	return r.d.Close()
+	err := r.d.Close()
+	r.d = nil
+	return err
 }
 
 // PasswordSet
 func (r *repo) PasswordSet(it vocab.Item, pw []byte) error {
 	path := itemBucketPath(it.GetLink())
-	err := r.Open()
-	if err != nil {
-		return err
-	}
-	defer r.Close()
 
-	err = r.d.Update(func(tx *bolt.Tx) error {
+	err := r.d.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists(r.root)
 		if err != nil {
 			return errors.Errorf("Not able to write to root bucket %s", r.root)
@@ -878,25 +845,20 @@ func (r *repo) PasswordSet(it vocab.Item, pw []byte) error {
 // PasswordCheck
 func (r *repo) PasswordCheck(it vocab.Item, pw []byte) error {
 	path := itemBucketPath(it.GetLink())
-	err := r.Open()
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-
 	m := Metadata{}
-	err = r.d.View(func(tx *bolt.Tx) error {
+	err := r.d.View(func(tx *bolt.Tx) error {
 		root := tx.Bucket(r.root)
 		if root == nil {
 			return ErrorInvalidRoot(r.root)
 		}
 		var b *bolt.Bucket
+		var err error
 		b, path, err = descendInBucket(root, path, false)
 		if err != nil {
 			return errors.Newf("Unable to find %s in root bucket", path)
 		}
 		entryBytes := b.Get([]byte(metaDataKey))
-		err := decodeFn(entryBytes, &m)
+		err = decodeFn(entryBytes, &m)
 		if err != nil {
 			return errors.Annotatef(err, "Could not unmarshal metadata")
 		}
@@ -910,20 +872,16 @@ func (r *repo) PasswordCheck(it vocab.Item, pw []byte) error {
 
 // LoadMetadata
 func (r *repo) LoadMetadata(iri vocab.IRI) (*Metadata, error) {
-	err := r.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer r.Close()
 	path := itemBucketPath(iri)
 
 	var m *Metadata
-	err = r.d.View(func(tx *bolt.Tx) error {
+	err := r.d.View(func(tx *bolt.Tx) error {
 		root := tx.Bucket(r.root)
 		if root == nil {
 			return ErrorInvalidRoot(r.root)
 		}
 		var b *bolt.Bucket
+		var err error
 		b, path, err = descendInBucket(root, path, false)
 		if err != nil {
 			return errors.Newf("Unable to find %s in root bucket", path)
@@ -937,14 +895,8 @@ func (r *repo) LoadMetadata(iri vocab.IRI) (*Metadata, error) {
 
 // SaveMetadata
 func (r *repo) SaveMetadata(m Metadata, iri vocab.IRI) error {
-	err := r.Open()
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-
 	path := itemBucketPath(iri)
-	err = r.d.Update(func(tx *bolt.Tx) error {
+	err := r.d.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists(r.root)
 		if err != nil {
 			return errors.Errorf("Not able to write to root bucket %s", r.root)

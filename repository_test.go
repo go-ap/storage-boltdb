@@ -86,7 +86,7 @@ func TestRepo_Load(t *testing.T) {
 
 func initBoltDBForTesting(t *testing.T) (*repo, error) {
 	c := Config{Path: t.TempDir()}
-	Bootstrap(c)
+	_ = Bootstrap(c)
 	r, err := New(c)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path for initializing boltdb %s: %s", c.Path, err)
@@ -136,6 +136,8 @@ func Test_repo_AddTo(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unable to initialize boltdb: %s", err)
 			}
+			_ = r.Open()
+			defer r.Close()
 
 			for _, it := range tt.args.it {
 				toCheck := vocab.Object{ID: it.GetLink()}

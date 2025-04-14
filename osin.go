@@ -80,13 +80,8 @@ func (r *repo) Close() {
 }
 
 func (r *repo) ListClients() ([]osin.Client, error) {
-	err := r.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer r.Close()
 	clients := make([]osin.Client, 0)
-	err = r.d.View(func(tx *bolt.Tx) error {
+	err := r.d.View(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
 			return errors.Errorf("Invalid bucket %s", r.root)
@@ -121,12 +116,8 @@ func (r *repo) GetClient(id string) (osin.Client, error) {
 		return nil, errors.NotFoundf("Empty client id")
 	}
 	c := osin.DefaultClient{}
-	err := r.Open()
-	if err != nil {
-		return &c, err
-	}
-	defer r.Close()
-	err = r.d.View(func(tx *bolt.Tx) error {
+
+	err := r.d.View(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
 			return errors.Errorf("Invalid bucket %s", r.root)
@@ -152,11 +143,6 @@ func (r *repo) GetClient(id string) (osin.Client, error) {
 
 // UpdateClient updates the client (identified by it's id) and replaces the values with the values of client.
 func (r *repo) UpdateClient(c osin.Client) error {
-	err := r.Open()
-	if err != nil {
-		return errors.Annotatef(err, "Unable to open boltdb storage")
-	}
-	defer r.Close()
 	cl := cl{
 		Id:          c.GetId(),
 		Secret:      c.GetSecret(),
@@ -187,11 +173,6 @@ func (r *repo) CreateClient(c osin.Client) error {
 
 // RemoveClient removes a client (identified by id) from the database. Returns an error if something went wrong.
 func (r *repo) RemoveClient(id string) error {
-	err := r.Open()
-	if err != nil {
-		return errors.Annotatef(err, "Unable to open boltdb storage")
-	}
-	defer r.Close()
 	return r.d.Update(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
@@ -207,12 +188,6 @@ func (r *repo) RemoveClient(id string) error {
 
 // SaveAuthorize saves authorize data.
 func (r *repo) SaveAuthorize(data *osin.AuthorizeData) error {
-	err := r.Open()
-	if err != nil {
-		return errors.Annotatef(err, "Unable to open boltdb storage")
-	}
-	defer r.Close()
-
 	auth := auth{
 		Client:      data.Client.GetId(),
 		Code:        data.Code,
@@ -248,14 +223,9 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 		return nil, errors.NotFoundf("Empty authorize code")
 	}
 	var data osin.AuthorizeData
-	err := r.Open()
-	if err != nil {
-		return &data, err
-	}
-	defer r.Close()
 
 	auth := auth{}
-	err = r.d.View(func(tx *bolt.Tx) error {
+	err := r.d.View(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
 			return errors.Errorf("Invalid bucket %s", r.root)
@@ -314,12 +284,6 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 
 // RemoveAuthorize revokes or deletes the authorization code.
 func (r *repo) RemoveAuthorize(code string) error {
-	err := r.Open()
-	if err != nil {
-		return errors.Annotatef(err, "Unable to open boltdb storage")
-	}
-	defer r.Close()
-
 	return r.d.Update(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
@@ -336,11 +300,6 @@ func (r *repo) RemoveAuthorize(code string) error {
 // SaveAccess writes AccessData.
 // If RefreshToken is not blank, it must save in a way that can be loaded using LoadRefresh.
 func (r *repo) SaveAccess(data *osin.AccessData) error {
-	err := r.Open()
-	if err != nil {
-		return errors.Annotatef(err, "Unable to open boltdb storage")
-	}
-	defer r.Close()
 	prev := ""
 	authorizeData := &osin.AuthorizeData{}
 
@@ -400,13 +359,8 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 		return nil, errors.NotFoundf("Empty access code")
 	}
 	var result osin.AccessData
-	err := r.Open()
-	if err != nil {
-		return &result, errors.Annotatef(err, "Unable to open boltdb storage")
-	}
-	defer r.Close()
 
-	err = r.d.View(func(tx *bolt.Tx) error {
+	err := r.d.View(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
 			return errors.Errorf("Invalid bucket %s", r.root)
@@ -449,10 +403,6 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 		c.UserData = cl.Extra
 
 		result.Client = &c
-		if err != nil {
-			r.errFn("Access code %s: %+s", code, errors.Annotatef(err, "Unable to load client for current access token"))
-			return nil
-		}
 
 		authB := rb.Bucket([]byte(authorizeBucket))
 		if authB == nil {
@@ -534,13 +484,9 @@ func (r *repo) LoadRefresh(code string) (*osin.AccessData, error) {
 	if code == "" {
 		return nil, errors.NotFoundf("Empty refresh code")
 	}
-	err := r.Open()
-	if err != nil {
-		return nil, errors.Annotatef(err, "Unable to open boltdb storage")
-	}
-	defer r.Close()
+
 	var ref ref
-	err = r.d.View(func(tx *bolt.Tx) error {
+	err := r.d.View(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
 			return errors.Errorf("Invalid bucket %s", r.root)
@@ -566,11 +512,6 @@ func (r *repo) LoadRefresh(code string) (*osin.AccessData, error) {
 
 // RemoveRefresh revokes or deletes refresh AccessData.
 func (r *repo) RemoveRefresh(code string) error {
-	err := r.Open()
-	if err != nil {
-		return errors.Annotatef(err, "Unable to open boltdb storage")
-	}
-	defer r.Close()
 	return r.d.Update(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
