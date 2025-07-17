@@ -8,7 +8,7 @@ require (
 	github.com/go-ap/filters v0.0.0-20250707122225-29d0a210d866
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.4.2
-	golang.org/x/crypto v0.39.0
+	golang.org/x/crypto v0.40.0
 )
 
 require (
@@ -23,7 +23,7 @@ require (
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
 	gopkg.in/neurosnap/sentences.v1 v1.0.7 // indirect
 )
