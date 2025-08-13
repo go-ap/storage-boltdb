@@ -11,6 +11,7 @@ import (
 	"github.com/go-ap/errors"
 	"github.com/go-ap/filters"
 	bolt "go.etcd.io/bbolt"
+	berrs "go.etcd.io/bbolt/errors"
 )
 
 var encodeItemFn = vocab.MarshalJSON
@@ -480,7 +481,12 @@ func deleteBucket(b *bolt.Bucket, it vocab.Item) error {
 		return nil
 	}
 	p := []byte(it.GetLink())
-	return b.DeleteBucket(p)
+
+	err := b.DeleteBucket(p)
+	if errors.Is(err, berrs.ErrBucketNotFound) {
+		return errors.NewNotFound(err, "unable to delete bucket")
+	}
+	return err
 }
 
 func createCollectionsInBucket(b *bolt.Bucket, it vocab.Item) error {
@@ -673,7 +679,9 @@ func (r *repo) RemoveFrom(colIRI vocab.IRI, it vocab.Item) error {
 					items.Append(iri.GetLink())
 				}
 			}
-			c.TotalItems -= 1
+			if c.TotalItems > 0 {
+				c.TotalItems -= 1
+			}
 			c.OrderedItems = items
 			return nil
 		})
