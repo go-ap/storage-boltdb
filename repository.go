@@ -647,7 +647,7 @@ func (r *repo) Save(it vocab.Item) (vocab.Item, error) {
 }
 
 // RemoveFrom
-func (r *repo) RemoveFrom(colIRI vocab.IRI, it vocab.Item) error {
+func (r *repo) RemoveFrom(colIRI vocab.IRI, items ...vocab.Item) error {
 	pathInBucket := itemBucketPath(colIRI.GetLink())
 	return r.d.Update(func(tx *bolt.Tx) error {
 		root, err := rootFromTx(tx, r.root)
@@ -673,16 +673,12 @@ func (r *repo) RemoveFrom(colIRI vocab.IRI, it vocab.Item) error {
 		}
 
 		err = vocab.OnOrderedCollection(col, func(c *vocab.OrderedCollection) error {
-			items := make(vocab.ItemCollection, 0)
-			for _, iri := range c.OrderedItems {
-				if !iri.GetLink().Equal(it.GetLink(), false) {
-					items.Append(iri.GetLink())
-				}
+			c.OrderedItems.Remove(items...)
+			if c.TotalItems <= uint(len(items)) {
+				c.TotalItems = 0
+			} else {
+				c.TotalItems -= uint(len(items))
 			}
-			if c.TotalItems > 0 {
-				c.TotalItems -= 1
-			}
-			c.OrderedItems = items
 			return nil
 		})
 		if err != nil {
@@ -722,7 +718,7 @@ func isStorageCollectionKey(p string) bool {
 var allStorageCollections = append(vocab.ActivityPubCollections, filters.FedBOXCollections...)
 
 // AddTo
-func (r *repo) AddTo(colIRI vocab.IRI, it vocab.Item) error {
+func (r *repo) AddTo(colIRI vocab.IRI, items ...vocab.Item) error {
 	pathInBucket := itemBucketPath(colIRI.GetLink())
 	return r.d.Update(func(tx *bolt.Tx) error {
 		root, err := rootFromTx(tx, r.root)
@@ -748,10 +744,8 @@ func (r *repo) AddTo(colIRI vocab.IRI, it vocab.Item) error {
 		}
 
 		err = vocab.OnOrderedCollection(col, func(c *vocab.OrderedCollection) error {
-			if !c.Contains(it.GetLink()) {
-				c.Append(it.GetLink())
-				c.TotalItems += 1
-			}
+			_ = c.Append(items...)
+			c.TotalItems += uint(len(items))
 			return nil
 		})
 		if err != nil {
