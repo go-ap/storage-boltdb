@@ -675,7 +675,7 @@ func (r *repo) RemoveFrom(colIRI vocab.IRI, it vocab.Item) error {
 		err = vocab.OnOrderedCollection(col, func(c *vocab.OrderedCollection) error {
 			items := make(vocab.ItemCollection, 0)
 			for _, iri := range c.OrderedItems {
-				if !iri.GetLink().Equals(it.GetLink(), false) {
+				if !iri.GetLink().Equal(it.GetLink(), false) {
 					items.Append(iri.GetLink())
 				}
 			}
