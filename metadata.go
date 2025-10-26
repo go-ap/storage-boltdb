@@ -22,8 +22,8 @@ type Metadata struct {
 }
 
 // PasswordSet
-func (r *repo) PasswordSet(it vocab.Item, pw []byte) error {
-	path := itemBucketPath(it.GetLink())
+func (r *repo) PasswordSet(iri vocab.IRI, pw []byte) error {
+	path := itemBucketPath(iri)
 
 	err := r.d.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists(r.root)
@@ -67,8 +67,8 @@ func (r *repo) PasswordSet(it vocab.Item, pw []byte) error {
 }
 
 // PasswordCheck
-func (r *repo) PasswordCheck(it vocab.Item, pw []byte) error {
-	path := itemBucketPath(it.GetLink())
+func (r *repo) PasswordCheck(iri vocab.IRI, pw []byte) error {
+	path := itemBucketPath(iri)
 	m := Metadata{}
 	err := r.d.View(func(tx *bolt.Tx) error {
 		root := tx.Bucket(r.root)
@@ -169,24 +169,10 @@ func (r *repo) LoadKey(iri vocab.IRI) (crypto.PrivateKey, error) {
 }
 
 // SaveKey saves a private key for an actor found by its IRI
-func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (vocab.Item, error) {
-	ob, err := r.loadOneFromBucket(iri)
-	if err != nil {
-		return nil, err
-	}
-
-	typ := ob.GetType()
-	if !vocab.ActorTypes.Contains(typ) {
-		return ob, errors.Newf("trying to generate keys for invalid ActivityPub object type: %s", typ)
-	}
-	actor, err := vocab.ToActor(ob)
-	if err != nil {
-		return ob, errors.Newf("trying to generate keys for invalid ActivityPub object type: %s", typ)
-	}
-
+func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (*vocab.PublicKey, error) {
 	m := new(Metadata)
-	if err = r.LoadMetadata(iri, m); err != nil && !errors.IsNotFound(err) {
-		return ob, err
+	if err := r.LoadMetadata(iri, m); err != nil && !errors.IsNotFound(err) {
+		return nil, err
 	}
 
 	if m.PrivateKey != nil {
@@ -195,7 +181,7 @@ func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (vocab.Item, error)
 	prvEnc, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
 		r.errFn("unable to x509.MarshalPKCS8PrivateKey() the private key %T for %s", key, iri)
-		return ob, err
+		return nil, err
 	}
 
 	m.PrivateKey = pem.EncodeToMemory(&pem.Block{
@@ -204,7 +190,7 @@ func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (vocab.Item, error)
 	})
 	if err = r.SaveMetadata(iri, m); err != nil {
 		r.errFn("unable to save the private key %T for %s", key, iri)
-		return ob, err
+		return nil, err
 	}
 
 	var pub crypto.PublicKey
@@ -219,22 +205,21 @@ func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (vocab.Item, error)
 		pub = prv.Public()
 	default:
 		r.errFn("received key %T does not match any of the known private key types", key)
-		return ob, nil
+		return nil, nil
 	}
 	pubEnc, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
 		r.errFn("unable to x509.MarshalPKIXPublicKey() the private key %T for %s", pub, iri)
-		return ob, err
+		return nil, err
 	}
 	pubEncoded := pem.EncodeToMemory(&pem.Block{
 		Type:  "PUBLIC KEY",
 		Bytes: pubEnc,
 	})
 
-	actor.PublicKey = vocab.PublicKey{
+	return &vocab.PublicKey{
 		ID:           vocab.IRI(fmt.Sprintf("%s#main", iri)),
 		Owner:        iri,
 		PublicKeyPem: string(pubEncoded),
-	}
-	return r.Save(actor)
+	}, nil
 }
