@@ -3,9 +3,10 @@ module github.com/go-ap/storage-boltdb
 go 1.25
 
 require (
-	github.com/go-ap/activitypub v0.0.0-20251027164102-d8bc432e9bc1
+	github.com/go-ap/activitypub v0.0.0-20251028130710-8bc6217f6c8d
 	github.com/go-ap/errors v0.0.0-20250905102357-4480b47a00c4
-	github.com/go-ap/filters v0.0.0-20251027164246-c84e70ece93e
+	github.com/go-ap/filters v0.0.0-20251028142811-9b3305faa3cd
+	github.com/go-ap/storage-conformance-suite v0.0.0-20251024140123-edb8fd0c3785
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.4.3
 	golang.org/x/crypto v0.43.0
@@ -16,6 +17,7 @@ require (
 	github.com/RoaringBitmap/roaring v1.9.4 // indirect
 	github.com/bits-and-blooms/bitset v1.24.2 // indirect
 	github.com/go-ap/jsonld v0.0.0-20250905102310-8480b0fe24d9 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jdkato/prose v1.2.1 // indirect
 	github.com/mariusor/qstring v0.0.0-20200204164351-5a99d46de39d // indirect
