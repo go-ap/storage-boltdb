@@ -107,10 +107,13 @@ func (r *repo) LoadMetadata(iri vocab.IRI, m any) error {
 		var err error
 		b, path, err = descendInBucket(root, path, false)
 		if err != nil {
-			return errors.Newf("Unable to find %s in root bucket", path)
+			return errors.NotFoundf("Unable to find %s in root bucket", path)
 		}
 		entryBytes := b.Get([]byte(metaDataKey))
-		return decodeFn(entryBytes, m)
+		if len(entryBytes) > 0 {
+			return decodeFn(entryBytes, m)
+		}
+		return nil
 	})
 }
 
@@ -201,7 +204,7 @@ func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (*vocab.PublicKey, 
 		pub = prv.Public()
 	case *dsa.PrivateKey:
 		pub = &prv.PublicKey
-	case *ed25519.PrivateKey:
+	case ed25519.PrivateKey:
 		pub = prv.Public()
 	default:
 		r.errFn("received key %T does not match any of the known private key types", key)

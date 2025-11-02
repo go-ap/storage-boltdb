@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	vocab "github.com/go-ap/activitypub"
 	"github.com/go-ap/errors"
 	"github.com/openshift/osin"
 	bolt "go.etcd.io/bbolt"
@@ -21,18 +22,18 @@ type cl struct {
 	Id          string
 	Secret      string
 	RedirectUri string
-	Extra       interface{}
+	UserData    any
 }
 
 type auth struct {
-	Client      string
+	Client      cl
 	Code        string
 	ExpiresIn   time.Duration
 	Scope       string
 	RedirectURI string
 	State       string
 	CreatedAt   time.Time
-	Extra       interface{}
+	UserData    vocab.IRI
 }
 
 type acc struct {
@@ -45,7 +46,7 @@ type acc struct {
 	Scope        string
 	RedirectURI  string
 	CreatedAt    time.Time
-	Extra        interface{}
+	UserData     any
 }
 
 type ref struct {
@@ -101,7 +102,7 @@ func (r *repo) ListClients() ([]osin.Client, error) {
 				Id:          cl.Id,
 				Secret:      cl.Secret,
 				RedirectUri: cl.RedirectUri,
-				UserData:    cl.Extra,
+				UserData:    cl.UserData,
 			}
 			clients = append(clients, &d)
 		}
@@ -128,17 +129,23 @@ func (r *repo) GetClient(id string) (osin.Client, error) {
 			return errors.Newf("Invalid bucket %s/%s", r.root, clientsBucket)
 		}
 		raw := cb.Get([]byte(id))
+		if len(raw) == 0 {
+			return errors.NotFoundf("%s not found", id)
+		}
 		if err := decodeFn(raw, &cl); err != nil {
 			return errors.Annotatef(err, "Unable to unmarshal client object")
 		}
 		c.Id = cl.Id
 		c.Secret = cl.Secret
 		c.RedirectUri = cl.RedirectUri
-		c.UserData = cl.Extra
+		c.UserData = cl.UserData
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return &c, err
+	return &c, nil
 }
 
 // UpdateClient updates the client (identified by it's id) and replaces the values with the values of client.
@@ -147,7 +154,7 @@ func (r *repo) UpdateClient(c osin.Client) error {
 		Id:          c.GetId(),
 		Secret:      c.GetSecret(),
 		RedirectUri: c.GetRedirectUri(),
-		Extra:       c.GetUserData(),
+		UserData:    c.GetUserData(),
 	}
 	raw, err := encodeFn(cl)
 	if err != nil {
@@ -188,17 +195,7 @@ func (r *repo) RemoveClient(id string) error {
 
 // SaveAuthorize saves authorize data.
 func (r *repo) SaveAuthorize(data *osin.AuthorizeData) error {
-	auth := auth{
-		Client:      data.Client.GetId(),
-		Code:        data.Code,
-		ExpiresIn:   time.Duration(data.ExpiresIn),
-		Scope:       data.Scope,
-		RedirectURI: data.RedirectUri,
-		State:       data.State,
-		CreatedAt:   data.CreatedAt.UTC(),
-		Extra:       data.UserData,
-	}
-	raw, err := encodeFn(auth)
+	raw, err := encodeFn(data)
 	if err != nil {
 		return errors.Annotatef(err, "Unable to marshal authorization object")
 	}
@@ -224,7 +221,7 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 	}
 	var data osin.AuthorizeData
 
-	auth := auth{}
+	a := auth{}
 	err := r.d.View(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
@@ -235,19 +232,22 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 			return errors.Newf("Invalid bucket %s/%s", r.root, authorizeBucket)
 		}
 		raw := ab.Get([]byte(code))
+		if len(raw) == 0 {
+			return errors.NotFoundf("%s not found", code)
+		}
 
-		if err := decodeFn(raw, &auth); err != nil {
+		if err := decodeFn(raw, &a); err != nil {
 			err = errors.Annotatef(err, "Unable to unmarshal authorization object")
 			r.errFn("Authorization code %s: %+s", code, err)
 			return err
 		}
-		data.Code = auth.Code
-		data.ExpiresIn = int32(auth.ExpiresIn)
-		data.Scope = auth.Scope
-		data.RedirectUri = auth.RedirectURI
-		data.State = auth.State
-		data.CreatedAt = auth.CreatedAt
-		data.UserData = auth.Extra
+		data.Code = a.Code
+		data.ExpiresIn = int32(a.ExpiresIn)
+		data.Scope = a.Scope
+		data.RedirectUri = a.RedirectURI
+		data.State = a.State
+		data.CreatedAt = a.CreatedAt
+		data.UserData = a.UserData
 
 		if data.ExpireAt().Before(time.Now().UTC()) {
 			err := errors.Errorf("Token expired at %s.", data.ExpireAt().String())
@@ -255,31 +255,19 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 			return err
 		}
 
-		c := osin.DefaultClient{}
-		cl := cl{}
-		cb := rb.Bucket([]byte(clientsBucket))
-		if cb != nil {
-			rawC := cb.Get([]byte(auth.Client))
-			if err := decodeFn(rawC, &cl); err != nil {
-				err = errors.Annotatef(err, "Unable to unmarshal client object")
-				r.errFn("Authorize code %s: %+s", code, err)
-				return nil
-			}
-			c.Id = cl.Id
-			c.Secret = cl.Secret
-			c.RedirectUri = cl.RedirectUri
-			c.UserData = cl.Extra
-
-			data.Client = &c
-		} else {
-			err := errors.Newf("Invalid bucket %s/%s", r.root, clientsBucket)
-			r.errFn("Authorize code %s: %+s", code, err)
-			return nil
+		data.Client = &osin.DefaultClient{
+			Id:          a.Client.Id,
+			Secret:      a.Client.Secret,
+			RedirectUri: a.Client.RedirectUri,
+			UserData:    a.Client.UserData,
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return &data, err
+	return &data, nil
 }
 
 // RemoveAuthorize revokes or deletes the authorization code.
@@ -332,7 +320,7 @@ func (r *repo) SaveAccess(data *osin.AccessData) error {
 		Scope:        data.Scope,
 		RedirectURI:  data.RedirectUri,
 		CreatedAt:    data.CreatedAt.UTC(),
-		Extra:        data.UserData,
+		UserData:     data.UserData,
 	}
 	raw, err := encodeFn(acc)
 	if err != nil {
@@ -372,7 +360,7 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 		}
 		raw := ab.Get([]byte(code))
 		if raw == nil {
-			return errors.Newf("Unable to load access information for %s/%s/%s", r.root, accessBucket, code)
+			return errors.NotFoundf("Unable to load access information for %s/%s/%s", r.root, accessBucket, code)
 		}
 		if err := decodeFn(raw, &access); err != nil {
 			return errors.Annotatef(err, "Unable to unmarshal access object")
@@ -383,7 +371,7 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 		result.Scope = access.Scope
 		result.RedirectUri = access.RedirectURI
 		result.CreatedAt = access.CreatedAt.UTC()
-		result.UserData = access.Extra
+		result.UserData = access.UserData
 
 		c := osin.DefaultClient{}
 		cl := cl{}
@@ -400,7 +388,7 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 		c.Id = cl.Id
 		c.Secret = cl.Secret
 		c.RedirectUri = cl.RedirectUri
-		c.UserData = cl.Extra
+		c.UserData = cl.UserData
 
 		result.Client = &c
 
@@ -423,13 +411,14 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 			}
 
 			data := osin.AuthorizeData{
+				Client:      &c,
 				Code:        auth.Code,
 				ExpiresIn:   int32(auth.ExpiresIn),
 				Scope:       auth.Scope,
 				RedirectUri: auth.RedirectURI,
 				State:       auth.State,
 				CreatedAt:   auth.CreatedAt,
-				UserData:    auth.Extra,
+				UserData:    auth.UserData,
 			}
 
 			if data.ExpireAt().Before(time.Now().UTC()) {
@@ -441,6 +430,9 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 		if access.Previous != "" {
 			var prevAccess acc
 			rawPrev := ab.Get([]byte(access.Previous))
+			if len(raw) == 0 {
+				return errors.NotFoundf("%s not found", access.Previous)
+			}
 			if err := decodeFn(rawPrev, &prevAccess); err != nil {
 				r.errFn("Access code %s: %+s", code, errors.Annotatef(err, "Unable to unmarshal previous access object"))
 				return nil
@@ -452,14 +444,17 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 			prev.Scope = prevAccess.Scope
 			prev.RedirectUri = prevAccess.RedirectURI
 			prev.CreatedAt = prevAccess.CreatedAt.UTC()
-			prev.UserData = prevAccess.Extra
+			prev.UserData = prevAccess.UserData
 
 			result.AccessData = &prev
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return &result, err
+	return &result, nil
 }
 
 // RemoveAccess revokes or deletes an AccessData.

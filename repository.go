@@ -305,26 +305,26 @@ func (r *repo) loadFromBucket(iri vocab.IRI) (vocab.Item, error) {
 			if err != nil {
 				return err
 			}
-			_ = vocab.OnObject(fromBucket, func(ob *vocab.Object) error {
+			err = vocab.OnObject(fromBucket, func(ob *vocab.Object) error {
 				ob.ID = iri
 				return nil
 			})
 			it = fromBucket
-		} else {
-			if len(remainderPath) == 0 {
-				// we have found an item
-				it, err = r.loadItem(b)
-				if err != nil {
-					return err
-				}
-				if it.IsCollection() {
-					return vocab.OnCollectionIntf(it, func(c vocab.CollectionInterface) error {
-						it, err = r.loadItemsElements(iri, c.Collection()...)
-						return err
-					})
-				}
-				return nil
+			return err
+		}
+		if len(remainderPath) == 0 {
+			// we have found an item
+			it, err = r.loadItem(b)
+			if err != nil {
+				return err
 			}
+			if it.IsCollection() {
+				return vocab.OnCollectionIntf(it, func(c vocab.CollectionInterface) error {
+					it, err = r.loadItemsElements(iri, c.Collection()...)
+					return err
+				})
+			}
+			return nil
 		}
 		return nil
 	})
@@ -339,6 +339,35 @@ func (r *repo) Load(i vocab.IRI, fil ...filters.Check) (vocab.Item, error) {
 }
 
 var pathSeparator = []byte{'/'}
+
+func deleteLastBucketFromRoot(root *bolt.Bucket, path []byte) error {
+	if root == nil {
+		return errors.Newf("trying to descend into nil bucket")
+	}
+	if len(path) == 0 {
+		return nil
+	}
+	bucketNames := bytes.Split(bytes.TrimRight(path, string(pathSeparator)), pathSeparator)
+
+	b := root
+	// descend the bucket tree up to the last found bucket
+	for _, name := range bucketNames[:len(bucketNames)-1] {
+		if len(name) == 0 {
+			continue
+		}
+		if b == nil {
+			return errors.Errorf("trying to load from nil bucket")
+		}
+		if cb := b.Bucket(name); cb != nil {
+			b = cb
+		}
+	}
+
+	if err := b.DeleteBucket(bucketNames[len(bucketNames)-1]); err != nil {
+		return errors.Annotatef(err, "%s", path)
+	}
+	return nil
+}
 
 func descendInBucket(root *bolt.Bucket, path []byte, create bool) (*bolt.Bucket, []byte, error) {
 	if root == nil {
@@ -539,14 +568,8 @@ func deleteItem(r *repo, it vocab.Item) error {
 		if !root.Writable() {
 			return errors.Errorf("Non writeable bucket %s", r.root)
 		}
-		b, _, err := descendInBucket(root, pathInBucket, true)
-		if err != nil {
-			return errors.Annotatef(err, "Unable to find %s in root bucket", pathInBucket)
-		}
-		if !b.Writable() {
-			return errors.Errorf("Non writeable bucket %s", pathInBucket)
-		}
-		return deleteBucket(b, it)
+
+		return deleteLastBucketFromRoot(root, pathInBucket)
 	})
 }
 
@@ -684,14 +707,15 @@ func (r *repo) RemoveFrom(colIRI vocab.IRI, items ...vocab.Item) error {
 		if err != nil {
 			return err
 		}
-		_, err = saveNewCollection(col, b, nil)
-		return err
+		return saveRawItem(col, b)
 	})
 }
 
 func buildCollection(items vocab.ItemCollection) vocab.WithCollectionFn {
 	return func(col *vocab.Collection) error {
-		col.Items = items
+		if len(items) > 0 {
+			col.Items = items
+		}
 		col.TotalItems = uint(len(items))
 		return nil
 	}
@@ -699,7 +723,9 @@ func buildCollection(items vocab.ItemCollection) vocab.WithCollectionFn {
 
 func buildOrderedCollection(items vocab.ItemCollection) vocab.WithOrderedCollectionFn {
 	return func(col *vocab.OrderedCollection) error {
-		col.OrderedItems = items
+		if len(items) > 0 {
+			col.OrderedItems = items
+		}
 		col.TotalItems = uint(len(items))
 		return nil
 	}
@@ -743,8 +769,9 @@ func (r *repo) AddTo(colIRI vocab.IRI, items ...vocab.Item) error {
 			}
 		}
 
+		iris := vocab.ItemCollection(items).IRIs()
 		err = vocab.OnOrderedCollection(col, func(c *vocab.OrderedCollection) error {
-			_ = c.Append(items...)
+			_ = c.OrderedItems.Append(iris.Collection()...)
 			c.TotalItems += uint(len(items))
 			return nil
 		})
