@@ -371,7 +371,9 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 		result.Scope = access.Scope
 		result.RedirectUri = access.RedirectURI
 		result.CreatedAt = access.CreatedAt.UTC()
-		result.UserData = access.UserData
+		if userData, ok := access.UserData.(string); ok {
+			result.UserData = vocab.IRI(userData)
+		}
 
 		c := osin.DefaultClient{}
 		cl := cl{}
