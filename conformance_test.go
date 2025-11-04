@@ -13,9 +13,6 @@ func initStorage(t *testing.T) conformance.ActivityPubStorage {
 	if err != nil {
 		t.Fatalf("unable to initialize storage: %s", err)
 	}
-	if err = storage.Open(); err != nil {
-		t.Fatalf("unable to open storage: %s", err)
-	}
 	return storage
 }
 

@@ -101,12 +101,12 @@ func (r *repo) loadItem(b *bolt.Bucket) (vocab.Item, error) {
 	if vocab.ObjectTypes.Contains(typ) {
 		_ = vocab.OnObject(it, loadFilteredPropsForObject(r))
 	}
-	if vocab.IntransitiveActivityTypes.Contains(typ) {
-		_ = vocab.OnIntransitiveActivity(it, loadFilteredPropsForIntransitiveActivity(r))
-	}
-	if vocab.ActivityTypes.Contains(typ) {
-		_ = vocab.OnActivity(it, loadFilteredPropsForActivity(r))
-	}
+	//if vocab.IntransitiveActivityTypes.Contains(typ) {
+	//	_ = vocab.OnIntransitiveActivity(it, loadFilteredPropsForIntransitiveActivity(r))
+	//}
+	//if vocab.ActivityTypes.Contains(typ) {
+	//	_ = vocab.OnActivity(it, loadFilteredPropsForActivity(r))
+	//}
 	return it, nil
 }
 
