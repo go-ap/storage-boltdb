@@ -68,7 +68,6 @@ var decodeFn = func(data []byte, m any) error {
 // This is to avoid cloning the connection at each method access.
 // Can return itself if not a problem.
 func (r *repo) Clone() osin.Storage {
-	r.Close()
 	return r
 }
 
