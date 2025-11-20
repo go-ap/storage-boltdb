@@ -80,6 +80,9 @@ func (r *repo) Close() {
 }
 
 func (r *repo) ListClients() ([]osin.Client, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
 	clients := make([]osin.Client, 0)
 	err := r.d.View(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
@@ -112,6 +115,9 @@ func (r *repo) ListClients() ([]osin.Client, error) {
 
 // GetClient loads the client by id
 func (r *repo) GetClient(id string) (osin.Client, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
 	if id == "" {
 		return nil, errors.NotFoundf("Empty client id")
 	}
@@ -149,6 +155,9 @@ func (r *repo) GetClient(id string) (osin.Client, error) {
 
 // UpdateClient updates the client (identified by it's id) and replaces the values with the values of client.
 func (r *repo) UpdateClient(c osin.Client) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
 	cl := cl{
 		Id:          c.GetId(),
 		Secret:      c.GetSecret(),
@@ -179,6 +188,9 @@ func (r *repo) CreateClient(c osin.Client) error {
 
 // RemoveClient removes a client (identified by id) from the database. Returns an error if something went wrong.
 func (r *repo) RemoveClient(id string) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
 	return r.d.Update(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
@@ -194,6 +206,12 @@ func (r *repo) RemoveClient(id string) error {
 
 // SaveAuthorize saves authorize data.
 func (r *repo) SaveAuthorize(data *osin.AuthorizeData) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
+	if data == nil {
+		return errors.Newf("unable to save nil authorization data")
+	}
 	raw, err := encodeFn(data)
 	if err != nil {
 		return errors.Annotatef(err, "Unable to marshal authorization object")
@@ -215,6 +233,9 @@ func (r *repo) SaveAuthorize(data *osin.AuthorizeData) error {
 // Client information MUST be loaded together.
 // Optionally can return error if expired.
 func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
 	if code == "" {
 		return nil, errors.NotFoundf("Empty authorize code")
 	}
@@ -271,6 +292,9 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 
 // RemoveAuthorize revokes or deletes the authorization code.
 func (r *repo) RemoveAuthorize(code string) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
 	return r.d.Update(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
@@ -287,9 +311,15 @@ func (r *repo) RemoveAuthorize(code string) error {
 // SaveAccess writes AccessData.
 // If RefreshToken is not blank, it must save in a way that can be loaded using LoadRefresh.
 func (r *repo) SaveAccess(data *osin.AccessData) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
+	if data == nil {
+		return errors.Newf("unable to save nil authorization data")
+	}
+
 	prev := ""
 	authorizeData := &osin.AuthorizeData{}
-
 	if data.AccessData != nil {
 		prev = data.AccessData.AccessToken
 	}
@@ -460,6 +490,9 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 
 // RemoveAccess revokes or deletes an AccessData.
 func (r *repo) RemoveAccess(code string) (err error) {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
 	return r.d.Update(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
@@ -477,6 +510,9 @@ func (r *repo) RemoveAccess(code string) (err error) {
 // AuthorizeData and AccessData DON'T NEED to be loaded if not easily available.
 // Optionally can return error if expired.
 func (r *repo) LoadRefresh(code string) (*osin.AccessData, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
 	if code == "" {
 		return nil, errors.NotFoundf("Empty refresh code")
 	}
@@ -508,6 +544,9 @@ func (r *repo) LoadRefresh(code string) (*osin.AccessData, error) {
 
 // RemoveRefresh revokes or deletes refresh AccessData.
 func (r *repo) RemoveRefresh(code string) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
 	return r.d.Update(func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {

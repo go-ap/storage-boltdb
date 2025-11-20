@@ -23,7 +23,16 @@ type Metadata struct {
 
 // PasswordSet
 func (r *repo) PasswordSet(iri vocab.IRI, pw []byte) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
+	if pw == nil {
+		return errors.Newf("could not generate hash for nil pw")
+	}
 	path := itemBucketPath(iri)
+	if len(path) == 0 {
+		return errors.NotFoundf("not found")
+	}
 
 	err := r.d.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists(r.root)
@@ -68,7 +77,11 @@ func (r *repo) PasswordSet(iri vocab.IRI, pw []byte) error {
 
 // PasswordCheck
 func (r *repo) PasswordCheck(iri vocab.IRI, pw []byte) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
 	path := itemBucketPath(iri)
+
 	m := Metadata{}
 	err := r.d.View(func(tx *bolt.Tx) error {
 		root := tx.Bucket(r.root)
@@ -82,8 +95,11 @@ func (r *repo) PasswordCheck(iri vocab.IRI, pw []byte) error {
 			return errors.Newf("Unable to find %s in root bucket", path)
 		}
 		entryBytes := b.Get([]byte(metaDataKey))
-		err = decodeFn(entryBytes, &m)
-		if err != nil {
+		if len(entryBytes) == 0 {
+
+			return errors.NotFoundf("not found")
+		}
+		if err = decodeFn(entryBytes, &m); err != nil {
 			return errors.Annotatef(err, "Could not unmarshal metadata")
 		}
 		if err := bcrypt.CompareHashAndPassword(m.Pw, pw); err != nil {
@@ -96,6 +112,9 @@ func (r *repo) PasswordCheck(iri vocab.IRI, pw []byte) error {
 
 // LoadMetadata
 func (r *repo) LoadMetadata(iri vocab.IRI, m any) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
 	path := itemBucketPath(iri)
 
 	return r.d.View(func(tx *bolt.Tx) error {
@@ -110,15 +129,22 @@ func (r *repo) LoadMetadata(iri vocab.IRI, m any) error {
 			return errors.NotFoundf("Unable to find %s in root bucket", path)
 		}
 		entryBytes := b.Get([]byte(metaDataKey))
-		if len(entryBytes) > 0 {
-			return decodeFn(entryBytes, m)
+		if len(entryBytes) == 0 {
+			return errors.NotFoundf("not found")
 		}
-		return nil
+		return decodeFn(entryBytes, m)
 	})
 }
 
 // SaveMetadata
 func (r *repo) SaveMetadata(iri vocab.IRI, m any) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
+	if m == nil {
+		return errors.Newf("Could not save nil metadata")
+	}
+
 	path := itemBucketPath(iri)
 	err := r.d.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists(r.root)
@@ -156,6 +182,9 @@ func (r *repo) SaveMetadata(iri vocab.IRI, m any) error {
 
 // LoadKey loads a private key for an actor found by its IRI
 func (r *repo) LoadKey(iri vocab.IRI) (crypto.PrivateKey, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
 	m := new(Metadata)
 	if err := r.LoadMetadata(iri, m); err != nil {
 		return nil, err
@@ -173,6 +202,9 @@ func (r *repo) LoadKey(iri vocab.IRI) (crypto.PrivateKey, error) {
 
 // SaveKey saves a private key for an actor found by its IRI
 func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (*vocab.PublicKey, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
 	m := new(Metadata)
 	if err := r.LoadMetadata(iri, m); err != nil && !errors.IsNotFound(err) {
 		return nil, err
@@ -183,7 +215,6 @@ func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (*vocab.PublicKey, 
 	}
 	prvEnc, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
-		r.errFn("unable to x509.MarshalPKCS8PrivateKey() the private key %T for %s", key, iri)
 		return nil, err
 	}
 
@@ -192,7 +223,6 @@ func (r *repo) SaveKey(iri vocab.IRI, key crypto.PrivateKey) (*vocab.PublicKey, 
 		Bytes: prvEnc,
 	})
 	if err = r.SaveMetadata(iri, m); err != nil {
-		r.errFn("unable to save the private key %T for %s", key, iri)
 		return nil, err
 	}
 

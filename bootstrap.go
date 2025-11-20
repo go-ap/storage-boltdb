@@ -1,23 +1,31 @@
 package boltdb
 
 import (
+	"os"
+
 	"github.com/go-ap/errors"
 	bolt "go.etcd.io/bbolt"
 )
 
 func Bootstrap(conf Config) error {
+	if conf.Path == "" {
+		return os.ErrNotExist
+	}
 	r, err := New(conf)
 	if err != nil {
 		return err
 	}
-
 	db, err := bolt.Open(r.path, 0600, nil)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	return bootstrap(db, r.root)
+}
+
+func bootstrap(db *bolt.DB, root []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		root, err := tx.CreateBucketIfNotExists(r.root)
+		root, err := tx.CreateBucketIfNotExists(root)
 		if err != nil {
 			return errors.Annotatef(err, "could not create root bucket")
 		}

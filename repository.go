@@ -334,6 +334,9 @@ func (r *repo) loadFromBucket(iri vocab.IRI) (vocab.Item, error) {
 
 // Load
 func (r *repo) Load(i vocab.IRI, fil ...filters.Check) (vocab.Item, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
 	ret, err := r.loadFromBucket(i)
 	return filters.Checks(fil).Run(ret), err
 }
@@ -430,6 +433,9 @@ func delete(r *repo, it vocab.Item) error {
 
 // Create
 func (r *repo) Create(col vocab.CollectionInterface) (vocab.CollectionInterface, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
 	var err error
 
 	cPath := itemBucketPath(col.GetLink())
@@ -655,8 +661,16 @@ func save(r *repo, it vocab.Item) (vocab.Item, error) {
 	return it, err
 }
 
+var errNotOpen = errors.Newf("repository not open")
+
 // Save
 func (r *repo) Save(it vocab.Item) (vocab.Item, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
+	if vocab.IsNil(it) {
+		return nil, errors.Newf("Unable to save nil element")
+	}
 	it, err := save(r, it)
 	if err == nil {
 		op := "Updated"
@@ -671,6 +685,9 @@ func (r *repo) Save(it vocab.Item) (vocab.Item, error) {
 
 // RemoveFrom
 func (r *repo) RemoveFrom(colIRI vocab.IRI, items ...vocab.Item) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
 	pathInBucket := itemBucketPath(colIRI.GetLink())
 	return r.d.Update(func(tx *bolt.Tx) error {
 		root, err := rootFromTx(tx, r.root)
@@ -685,7 +702,7 @@ func (r *repo) RemoveFrom(colIRI vocab.IRI, items ...vocab.Item) error {
 			return errors.Errorf("Non writeable bucket %s", pathInBucket)
 		}
 		col, err := loadRawItemFromBucket(b)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil {
 			return err
 		}
 		if col == nil {
@@ -731,21 +748,26 @@ func buildOrderedCollection(items vocab.ItemCollection) vocab.WithOrderedCollect
 	}
 }
 
-func iriIsStorageCollection(i vocab.IRI) bool {
-	_, lst := vocab.Split(i)
-	return isStorageCollectionKey(string(lst))
-}
-
 func isStorageCollectionKey(p string) bool {
 	lst := vocab.CollectionPath(filepath.Base(p))
 	return filters.FedBOXCollections.Contains(lst) || vocab.OfActor.Contains(lst) || vocab.OfObject.Contains(lst)
 }
 
-var allStorageCollections = append(vocab.ActivityPubCollections, filters.FedBOXCollections...)
+func isHiddenCollectionKey(p string) bool {
+	lst := vocab.CollectionPath(filepath.Base(p))
+	return filters.HiddenCollections.Contains(lst)
+}
 
 // AddTo
 func (r *repo) AddTo(colIRI vocab.IRI, items ...vocab.Item) error {
-	pathInBucket := itemBucketPath(colIRI.GetLink())
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
+	if len(items) == 0 {
+		return nil
+	}
+
+	pathInBucket := itemBucketPath(colIRI)
 	return r.d.Update(func(tx *bolt.Tx) error {
 		root, err := rootFromTx(tx, r.root)
 		if err != nil {
@@ -759,20 +781,32 @@ func (r *repo) AddTo(colIRI vocab.IRI, items ...vocab.Item) error {
 			return errors.Errorf("Non writeable bucket %s", pathInBucket)
 		}
 		col, err := loadRawItemFromBucket(b)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		if col == nil {
-			col, err = createCollection(b, colIRI, nil)
-			if err != nil {
+		if err != nil {
+			if errors.IsNotFound(err) && isHiddenCollectionKey(colIRI.String()) {
+				// NOTE(marius): for hidden collections we might not have the __raw file on disk, so we just try to create it
+				// Here we assume the owner can be inferred from the collection IRI, but that's just a FedBOX implementation
+				// detail. We should find a different way to pass collection owner - maybe the processing package checks for
+				// existence of the blocked collection, and explicitly creates it if it doesn't.
+				maybeOwner, _ := vocab.Split(colIRI)
+				if col, err = createCollection(b, colIRI, maybeOwner); err != nil {
+					return err
+				}
+			} else {
 				return err
 			}
 		}
 
-		iris := vocab.ItemCollection(items).IRIs()
 		err = vocab.OnOrderedCollection(col, func(c *vocab.OrderedCollection) error {
-			_ = c.OrderedItems.Append(iris.Collection()...)
-			c.TotalItems += uint(len(items))
+			for _, it := range items {
+				if vocab.IsIRI(it) {
+					it, err = r.loadOneFromBucket(it.GetLink())
+					if err != nil {
+						return errors.NewNotFound(err, "invalid item to add to collection")
+					}
+				}
+				_ = c.OrderedItems.Append(it.GetLink())
+				c.TotalItems += 1
+			}
 			return nil
 		})
 		if err != nil {
@@ -784,6 +818,12 @@ func (r *repo) AddTo(colIRI vocab.IRI, items ...vocab.Item) error {
 
 // Delete
 func (r *repo) Delete(it vocab.Item) error {
+	if r == nil || r.d == nil {
+		return errNotOpen
+	}
+	if vocab.IsNil(it) {
+		return nil
+	}
 	return delete(r, it)
 }
 
@@ -815,15 +855,19 @@ func (r *repo) close() error {
 	return err
 }
 
-func Path(c Config) (string, error) {
-	if !filepath.IsAbs(c.Path) {
-		c.Path, _ = filepath.Abs(c.Path)
+func fullPath(base *string) (string, error) {
+	if !filepath.IsAbs(*base) {
+		*base, _ = filepath.Abs(*base)
 	}
-	if err := mkDirIfNotExists(c.Path); err != nil {
+	if err := mkDirIfNotExists(*base); err != nil {
 		return "", err
 	}
-	p := filepath.Join(c.Path, "storage.bdb")
+	p := filepath.Join(*base, "storage.bdb")
 	return p, nil
+}
+
+func Path(c Config) (string, error) {
+	return fullPath(&c.Path)
 }
 
 func mkDirIfNotExists(p string) error {
