@@ -3,6 +3,8 @@ packages:
   - go
 sources:
   - https://github.com/go-ap/storage-boltdb
+secrets:
+  - 0824018e-4126-4f9c-ba18-8e3933ab9c6c
 environment:
   GO111MODULE: 'on'
 tasks:
@@ -14,3 +16,4 @@ tasks:
   - coverage: |
       set -a +x
       cd storage-boltdb && make coverage
+      go run github.com/mattn/goveralls@latest -coverprofile=storage-boltdb.coverprofile -service=sourcehut -repotokenfile ~/.coveralls.tok
