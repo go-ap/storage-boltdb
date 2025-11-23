@@ -466,10 +466,17 @@ func createCollection(b *bolt.Bucket, colIRI vocab.IRI, owner vocab.Item) (vocab
 		ID:        colIRI,
 		Type:      vocab.OrderedCollectionType,
 		CC:        vocab.ItemCollection{vocab.PublicNS},
-		Published: time.Now().UTC(),
+		Published: time.Now().Truncate(time.Second).UTC(),
 	}
 	if !vocab.IsNil(owner) {
 		col.AttributedTo = owner.GetLink()
+		_ = vocab.OnObject(owner, func(object *vocab.Object) error {
+			if !object.Published.IsZero() {
+				col.Published = object.Published
+			}
+			return nil
+		})
+
 	}
 	return saveCollection(b, &col)
 }
