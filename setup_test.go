@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	mrand "math/rand"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,6 +39,34 @@ func compareErrors(x, y interface{}) bool {
 }
 
 var EquateWeakErrors = cmp.FilterValues(areErrors, cmp.Comparer(compareErrors))
+
+func areItemCollections(a, b any) bool {
+	_, ok1 := a.(vocab.ItemCollection)
+	_, ok3 := a.(*vocab.ItemCollection)
+	_, ok2 := b.(vocab.ItemCollection)
+	_, ok4 := b.(*vocab.ItemCollection)
+	return (ok1 || ok3) && (ok2 || ok4)
+}
+
+func compareItemCollections(x, y interface{}) bool {
+	var i1 vocab.Item
+	var i2 vocab.Item
+	if ic1, ok := x.(vocab.ItemCollection); ok {
+		i1 = ic1
+	}
+	if ic1, ok := x.(*vocab.ItemCollection); ok {
+		i1 = *ic1
+	}
+	if ic2, ok := y.(vocab.ItemCollection); ok {
+		i2 = ic2
+	}
+	if ic2, ok := y.(*vocab.ItemCollection); ok {
+		i2 = *ic2
+	}
+	return vocab.ItemsEqual(i1, i2)
+}
+
+var EquateItemCollections = cmp.FilterValues(areItemCollections, cmp.Comparer(compareItemCollections))
 
 type fields struct {
 	path string
@@ -330,15 +357,6 @@ func setId(base vocab.IRI) func(ob *vocab.Object) error {
 	}
 }
 
-func sortCollectionByIRI(col vocab.CollectionInterface) error {
-	sort.Slice(col.Collection(), func(i, j int) bool {
-		iti := col.Collection()[i]
-		itj := col.Collection()[j]
-		return iti.GetLink().String() <= itj.GetLink().String()
-	})
-	return nil
-}
-
 func filter(items vocab.ItemCollection, fil ...filters.Check) vocab.ItemCollection {
 	result, _ := vocab.ToItemCollection(filters.Checks(fil).Run(items))
 	return *result
@@ -351,21 +369,27 @@ func wantsRootOutboxPage(maxItems int, ff ...filters.Check) vocab.Item {
 		AttributedTo: rootIRI,
 		Published:    publishedTime,
 		CC:           vocab.ItemCollection{vocab.IRI("https://www.w3.org/ns/activitystreams#Public")},
+		PartOf:       rootOutboxIRI,
 		First:        vocab.IRI(string(rootOutboxIRI) + "?" + filters.ToValues(filters.WithMaxCount(maxItems)).Encode()),
+		Next:         vocab.IRI(string(rootOutboxIRI) + "?" + filters.ToValues(filters.After(filters.SameID(rootIRI.AddPath("create/2"))), filters.WithMaxCount(maxItems)).Encode()),
 		OrderedItems: filter(*allActivities.Load(), ff...),
 		TotalItems:   allActivities.Load().Count(),
 	}
 }
 
 func wantsRootOutbox(ff ...filters.Check) vocab.Item {
-	return &vocab.OrderedCollection{
+	col := &vocab.OrderedCollection{
 		ID:           rootOutboxIRI,
 		Type:         vocab.OrderedCollectionType,
 		AttributedTo: rootIRI,
 		Published:    publishedTime,
 		CC:           vocab.ItemCollection{vocab.IRI("https://www.w3.org/ns/activitystreams#Public")},
-		First:        vocab.IRI(string(rootOutboxIRI) + "?" + filters.ToValues(filters.WithMaxCount(filters.MaxItems)).Encode()),
 		OrderedItems: filter(*allActivities.Load(), ff...),
 		TotalItems:   allActivities.Load().Count(),
 	}
+	if len(ff) > 0 {
+		col.First = vocab.IRI(string(rootOutboxIRI) + "?" + filters.ToValues(filters.WithMaxCount(filters.MaxItems)).Encode())
+	}
+
+	return col
 }
