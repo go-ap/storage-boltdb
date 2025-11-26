@@ -254,7 +254,7 @@ func Test_repo_RemoveFrom(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := mockRepo(t, fields{path: tt.path}, tt.setupFns...)
-			defer r.Close()
+			t.Cleanup(r.Close)
 
 			err := r.RemoveFrom(tt.args.colIRI, tt.args.it)
 			if !cmp.Equal(tt.wantErr, err, EquateWeakErrors) {
@@ -399,7 +399,7 @@ func Test_repo_AddTo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := mockRepo(t, fields{path: tt.path}, tt.setupFns...)
-			defer r.Close()
+			t.Cleanup(r.Close)
 
 			err := r.AddTo(tt.args.colIRI, tt.args.it)
 			if tt.wantErr != nil {
@@ -443,7 +443,7 @@ func Test_repo_AddTo(t *testing.T) {
 
 func Test_repo_Load(t *testing.T) {
 	r := mockRepo(t, fields{path: t.TempDir()}, withOpenRoot, withGeneratedMocks)
-	defer r.Close()
+	t.Cleanup(r.Close)
 
 	type args struct {
 		iri vocab.IRI
@@ -586,7 +586,7 @@ func Test_repo_Save(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := mockRepo(t, tt.fields, tt.setupFns...)
-			defer r.Close()
+			t.Cleanup(r.Close)
 
 			got, err := r.Save(tt.it)
 			if !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
@@ -637,7 +637,7 @@ func Test_repo_Delete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := mockRepo(t, tt.fields, tt.setupFns...)
-			defer r.Close()
+			t.Cleanup(r.Close)
 
 			if err := r.Delete(tt.it); !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
 				t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)

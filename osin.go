@@ -257,8 +257,6 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 		}
 
 		if err := decodeFn(raw, &a); err != nil {
-			err = errors.Annotatef(err, "Unable to unmarshal authorization object")
-			r.errFn("Authorization code %s: %+s", code, err)
 			return err
 		}
 		data.Code = a.Code
@@ -330,7 +328,6 @@ func (r *repo) SaveAccess(data *osin.AccessData) error {
 
 	if data.RefreshToken != "" {
 		if err := r.saveRefresh(data.RefreshToken, data.AccessToken); err != nil {
-			r.errFn("Refresh id %s: %+s", data.Client.GetId(), err)
 			return err
 		}
 	}
