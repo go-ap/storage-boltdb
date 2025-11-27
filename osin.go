@@ -39,7 +39,6 @@ type auth struct {
 type acc struct {
 	Client       string
 	Authorize    string
-	Previous     string
 	AccessToken  string
 	RefreshToken string
 	ExpiresIn    time.Duration
@@ -123,7 +122,16 @@ func (r *repo) GetClient(id string) (osin.Client, error) {
 	}
 	c := osin.DefaultClient{}
 
-	err := r.d.View(func(tx *bolt.Tx) error {
+	err := r.d.View(r.loadClientFromTx(id, &c))
+	if err != nil {
+		return nil, err
+	}
+
+	return &c, nil
+}
+
+func (r *repo) loadClientFromTx(id string, c *osin.DefaultClient) func(*bolt.Tx) error {
+	return func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
 			return errors.Errorf("Invalid bucket %s", r.root)
@@ -145,12 +153,7 @@ func (r *repo) GetClient(id string) (osin.Client, error) {
 		c.RedirectUri = cl.RedirectUri
 		c.UserData = cl.UserData
 		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
-
-	return &c, nil
 }
 
 // UpdateClient updates the client (identified by it's id) and replaces the values with the values of client.
@@ -241,8 +244,16 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 	}
 	var data osin.AuthorizeData
 
-	a := auth{}
-	err := r.d.View(func(tx *bolt.Tx) error {
+	err := r.d.View(r.loadAuthorizeFromTx(code, &data))
+	if err != nil {
+		return nil, err
+	}
+
+	return &data, nil
+}
+
+func (r *repo) loadAuthorizeFromTx(code string, data *osin.AuthorizeData) func(tx *bolt.Tx) error {
+	return func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
 			return errors.Errorf("Invalid bucket %s", r.root)
@@ -256,6 +267,7 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 			return errors.NotFoundf("%s not found", code)
 		}
 
+		a := auth{}
 		if err := decodeFn(raw, &a); err != nil {
 			return err
 		}
@@ -280,12 +292,7 @@ func (r *repo) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 			UserData:    a.Client.UserData,
 		}
 		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
-
-	return &data, nil
 }
 
 // RemoveAuthorize revokes or deletes the authorization code.
@@ -316,10 +323,9 @@ func (r *repo) SaveAccess(data *osin.AccessData) error {
 		return errors.Newf("unable to save nil authorization data")
 	}
 
-	prev := ""
 	authorizeData := &osin.AuthorizeData{}
-	if data.AccessData != nil {
-		prev = data.AccessData.AccessToken
+	if data.AccessData != nil && data.RefreshToken == "" {
+		data.RefreshToken = data.AccessData.AccessToken
 	}
 
 	if data.AuthorizeData != nil {
@@ -339,7 +345,6 @@ func (r *repo) SaveAccess(data *osin.AccessData) error {
 	acc := acc{
 		Client:       data.Client.GetId(),
 		Authorize:    authorizeData.Code,
-		Previous:     prev,
 		AccessToken:  data.AccessToken,
 		RefreshToken: data.RefreshToken,
 		ExpiresIn:    time.Duration(data.ExpiresIn),
@@ -374,7 +379,16 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 	}
 	var result osin.AccessData
 
-	err := r.d.View(func(tx *bolt.Tx) error {
+	err := r.d.View(r.loadAccessFromTx(code, &result, true))
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func (r *repo) loadAccessFromTx(code string, result *osin.AccessData, loadDeps bool) func(tx *bolt.Tx) error {
+	return func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
 			return errors.Errorf("Invalid bucket %s", r.root)
@@ -401,88 +415,33 @@ func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
 			result.UserData = vocab.IRI(userData)
 		}
 
-		c := osin.DefaultClient{}
-		cl := cl{}
-		cb := rb.Bucket([]byte(clientsBucket))
-		if cb == nil {
-			r.errFn("Access code %s: %+s", code, errors.Newf("Invalid bucket %s/%s", r.root, clientsBucket))
-			return nil
+		if access.Client != "" {
+			c := osin.DefaultClient{}
+			if err := r.loadClientFromTx(access.Client, &c)(tx); err == nil {
+				result.Client = &c
+			}
 		}
-		rawC := cb.Get([]byte(access.Client))
-		if err := decodeFn(rawC, &cl); err != nil {
-			r.errFn("Access code %s: %+s", code, errors.Annotatef(err, "Unable to unmarshal client object"))
-			return nil
-		}
-		c.Id = cl.Id
-		c.Secret = cl.Secret
-		c.RedirectUri = cl.RedirectUri
-		c.UserData = cl.UserData
 
-		result.Client = &c
-
-		authB := rb.Bucket([]byte(authorizeBucket))
-		if authB == nil {
-			r.errFn("Access code %s: %+s", code, errors.Newf("Invalid bucket %s/%s", r.root, authorizeBucket))
-			return nil
-		}
-		if access.Authorize != "" {
-			auth := auth{}
-
-			rawAuth := authB.Get([]byte(access.Authorize))
-			if rawAuth == nil {
-				r.errFn("Access code %s: %+s", code, errors.Newf("Invalid authorize data"))
-				return nil
+		if loadDeps {
+			if access.Authorize != "" {
+				a := osin.AuthorizeData{}
+				if err := r.loadAuthorizeFromTx(access.Authorize, &a)(tx); err == nil {
+					if a.ExpireAt().Before(time.Now().UTC()) {
+						r.errFn("Access code %s: %+s", code, errors.Errorf("Token expired at %s.", a.ExpireAt().String()))
+						return nil
+					}
+					result.AuthorizeData = &a
+				}
 			}
-			if err := decodeFn(rawAuth, &auth); err != nil {
-				r.errFn("Client code %s: %+s", code, errors.Annotatef(err, "Unable to unmarshal authorization object"))
-				return nil
+			if access.RefreshToken != "" {
+				rf := osin.AccessData{}
+				if err := r.loadAccessFromTx(access.RefreshToken, &rf, false)(tx); err == nil {
+					result.AccessData = &rf
+				}
 			}
-
-			data := osin.AuthorizeData{
-				Client:      &c,
-				Code:        auth.Code,
-				ExpiresIn:   int32(auth.ExpiresIn),
-				Scope:       auth.Scope,
-				RedirectUri: auth.RedirectURI,
-				State:       auth.State,
-				CreatedAt:   auth.CreatedAt,
-				UserData:    auth.UserData,
-			}
-
-			if data.ExpireAt().Before(time.Now().UTC()) {
-				r.errFn("Access code %s: %+s", code, errors.Errorf("Token expired at %s.", data.ExpireAt().String()))
-				return nil
-			}
-			result.AuthorizeData = &data
-		}
-		if access.Previous != "" {
-			var prevAccess acc
-			rawPrev := ab.Get([]byte(access.Previous))
-			if len(raw) == 0 {
-				return errors.NotFoundf("%s not found", access.Previous)
-			}
-			if err := decodeFn(rawPrev, &prevAccess); err != nil {
-				r.errFn("Access code %s: %+s", code, errors.Annotatef(err, "Unable to unmarshal previous access object"))
-				return nil
-			}
-			prev := osin.AccessData{}
-			prev.AccessToken = prevAccess.AccessToken
-			prev.RefreshToken = prevAccess.RefreshToken
-			prev.ExpiresIn = int32(prevAccess.ExpiresIn)
-			prev.Scope = prevAccess.Scope
-			prev.RedirectUri = prevAccess.RedirectURI
-			prev.CreatedAt = prevAccess.CreatedAt.UTC()
-			prev.UserData = prevAccess.UserData
-
-			result.AccessData = &prev
 		}
 		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
-
-	return &result, nil
 }
 
 // RemoveAccess revokes or deletes an AccessData.
@@ -514,29 +473,34 @@ func (r *repo) LoadRefresh(code string) (*osin.AccessData, error) {
 		return nil, errors.NotFoundf("Empty refresh code")
 	}
 
-	var ref ref
-	err := r.d.View(func(tx *bolt.Tx) error {
+	result := osin.AccessData{}
+	if err := r.d.View(r.loadRefreshFromTx(code, &result)); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (r *repo) loadRefreshFromTx(code string, result *osin.AccessData) func(tx *bolt.Tx) error {
+	return func(tx *bolt.Tx) error {
 		rb := tx.Bucket(r.root)
 		if rb == nil {
 			return errors.Errorf("Invalid bucket %s", r.root)
 		}
 		cb := rb.Bucket([]byte(refreshBucket))
-		prefix := []byte(code)
-		u := cb.Cursor()
-		if u == nil {
-			return errors.Errorf("Invalid bucket cursor %s/%s", r.root, refreshBucket)
+
+		var ref ref
+		raw := cb.Get([]byte(code))
+		if raw == nil {
+			return errors.NotFoundf("not found")
 		}
-		for k, v := u.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = u.Next() {
-			if err := decodeFn(v, &ref); err != nil {
-				return errors.Annotatef(err, "Unable to unmarshal refresh token object")
-			}
+		if err := decodeFn(raw, &ref); err != nil {
+			return errors.Annotatef(err, "Unable to unmarshal refresh token object")
 		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
+		if ref.Access == code {
+			return nil
+		}
+		return r.loadAccessFromTx(ref.Access, result, true)(tx)
 	}
-	return r.LoadAccess(ref.Access)
 }
 
 // RemoveRefresh revokes or deletes refresh AccessData.

@@ -2,7 +2,9 @@ package boltdb
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/go-ap/errors"
 	"github.com/go-ap/filters"
 	"github.com/google/go-cmp/cmp"
+	bolt "go.etcd.io/bbolt"
 )
 
 func TestNew(t *testing.T) {
@@ -35,25 +38,85 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestRepo_Open(t *testing.T) {
-	dir := os.TempDir()
-	conf := Config{Path: dir}
-	path, _ := Path(conf)
-	err := Bootstrap(conf)
-	if err != nil {
-		t.Errorf("Unable to bootstrap boltdb %s: %s", path, err)
+func withCreatePath(r *repo) *repo {
+	validPath, err := Path(Config{Path: r.path})
+	if err != nil && r.errFn != nil {
+		r.errFn("Unable to build path from %s: %s", r.path, err)
+	} else {
+		r.path = validPath
 	}
-	defer os.Remove(path)
-	repo, err := New(conf)
-	if err != nil {
-		t.Errorf("unexpected error: %s", err)
+	return r
+}
+
+func Test_repo_Open(t *testing.T) {
+	tempDir := t.TempDir()
+	errTempIsDir := &fs.PathError{
+		Op:   "open",
+		Path: tempDir,
+		Err:  syscall.EISDIR,
 	}
-	err = repo.Open()
-	if err != nil {
-		t.Errorf("Unable to open boltdb %s: %s", path, err)
+	type fields struct {
+		d     *bolt.DB
+		root  []byte
+		path  string
+		logFn loggerFn
+		errFn loggerFn
 	}
-	if repo.d == nil {
-		t.Errorf("Nil %T for path %s", repo.d, path)
+	tests := []struct {
+		name     string
+		fields   fields
+		setupFns []initFn
+		wantErr  error
+	}{
+		{
+			name:    "empty",
+			fields:  fields{},
+			wantErr: &fs.PathError{Op: "open", Path: "", Err: syscall.ENOENT},
+		},
+		{
+			name:    "with invalid path",
+			fields:  fields{path: tempDir},
+			wantErr: errTempIsDir,
+		},
+		{
+			name:     "with valid path",
+			fields:   fields{path: t.TempDir()},
+			setupFns: []initFn{withCreatePath},
+		},
+	}
+
+	t.Run("Error on nil repo", func(t *testing.T) {
+		var r *repo
+		wantErr := errors.Newf("Unable to open uninitialized db")
+		if err := r.Open(); !cmp.Equal(err, wantErr, EquateWeakErrors) {
+			t.Errorf("Open() error = %s", cmp.Diff(wantErr, err, EquateWeakErrors))
+		}
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// NOTE(marius): we don't use the mockRepo function here as we need to check failure cases
+			r := &repo{
+				d:     tt.fields.d,
+				root:  tt.fields.root,
+				path:  tt.fields.path,
+				logFn: tt.fields.logFn,
+				errFn: tt.fields.errFn,
+			}
+			for _, fn := range tt.setupFns {
+				_ = fn(r)
+			}
+
+			if err := r.Open(); !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
+				t.Errorf("Open() error = %s", cmp.Diff(tt.wantErr, err, EquateWeakErrors))
+			}
+			if tt.wantErr != nil {
+				return
+			}
+			if tt.fields.path != "" && r.d == nil {
+				t.Errorf("Open() boltdb is nil for path %s: %T: %v", tt.fields.path, r.d, r.d)
+			}
+		})
 	}
 }
 

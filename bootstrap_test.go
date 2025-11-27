@@ -10,52 +10,6 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-func TestClean1(t *testing.T) {
-	dir := os.TempDir()
-
-	conf := Config{Path: dir}
-	path, _ := Path(conf)
-	{
-		Clean(conf)
-	}
-	{
-		db, err := bolt.Open(path, 0600, nil)
-		if err != nil {
-			t.Errorf("Unable to create boltdb at path %s", path)
-		}
-		db.Close()
-
-		err = Clean(conf)
-	}
-
-	{
-		db, err := bolt.Open(path, 0600, nil)
-		if err != nil {
-			t.Errorf("Unable to create boltdb at path %s", path)
-		}
-		err = db.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists([]byte(rootBucket))
-			if err != nil {
-				return errors.Annotatef(err, "could not create root bucket")
-			}
-			return nil
-		})
-		if err != nil {
-			t.Errorf("Unable to create root bucket %s in boltdb %s", rootBucket, path)
-		}
-		db.Close()
-
-		err = Clean(conf)
-		if err != nil {
-			t.Errorf("Error received when cleaning valid boltdb %s with valid root bucket %s: %s", path, rootBucket, err)
-		}
-	}
-	err := os.Remove(path)
-	if err != nil {
-		t.Logf("Unable to clean boltdb path %s", path)
-	}
-}
-
 func TestBootstrap(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -129,7 +83,7 @@ func TestClean(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name:    "temp - exists",
+			name:    "temp - exists, but empty",
 			arg:     Config{Path: t.TempDir()},
 			wantErr: nil,
 		},
@@ -138,11 +92,16 @@ func TestClean(t *testing.T) {
 			arg:     Config{Path: filepath.Join(t.TempDir(), "test")},
 			wantErr: nil,
 		},
+		{
+			name:    "invalid path " + os.DevNull,
+			arg:     Config{Path: os.DevNull},
+			wantErr: errors.Errorf("path exists, and is not a folder %s", os.DevNull),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := Clean(tt.arg); !errors.Is(err, tt.wantErr) {
-				t.Errorf("Clean() error = %v, wantErr %v", err, tt.wantErr)
+			if err := Clean(tt.arg); !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
+				t.Errorf("Clean() error = %s", cmp.Diff(tt.wantErr, err, EquateWeakErrors))
 			}
 		})
 	}

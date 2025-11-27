@@ -38,7 +38,7 @@ func Test_repo_LoadAccess(t *testing.T) {
 			wantErr: errors.NotFoundf("Empty access code"),
 		},
 		{
-			name:     "save access",
+			name:     "load access",
 			fields:   fields{path: t.TempDir()},
 			setupFns: []initFn{withOpenRoot, withClient, withAuthorization, withAccess},
 			code:     "access-666",
