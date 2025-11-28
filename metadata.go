@@ -96,7 +96,6 @@ func (r *repo) PasswordCheck(iri vocab.IRI, pw []byte) error {
 		}
 		entryBytes := b.Get([]byte(metaDataKey))
 		if len(entryBytes) == 0 {
-
 			return errors.NotFoundf("not found")
 		}
 		if err = decodeFn(entryBytes, &m); err != nil {

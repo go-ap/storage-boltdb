@@ -1,8 +1,10 @@
 package boltdb
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/go-ap/errors"
@@ -10,7 +12,17 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+func createForbiddenDir(t *testing.T) string {
+	forbiddenPath := filepath.Join(t.TempDir(), "forbidden")
+	err := os.MkdirAll(forbiddenPath, 0o000)
+	if err != nil {
+		t.Fatalf("unable to create forbidden test path %s: %s", forbiddenPath, err)
+	}
+	return forbiddenPath
+}
+
 func TestBootstrap(t *testing.T) {
+	forbiddenPath := createForbiddenDir(t)
 	tests := []struct {
 		name    string
 		arg     Config
@@ -25,11 +37,19 @@ func TestBootstrap(t *testing.T) {
 			name: "temp",
 			arg:  Config{Path: filepath.Join(t.TempDir())},
 		},
+		{
+			name:    "forbidden",
+			arg:     Config{Path: forbiddenPath},
+			wantErr: &fs.PathError{Op: "open", Path: filepath.Join(forbiddenPath, dbFile), Err: syscall.EACCES},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := Bootstrap(tt.arg); !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
 				t.Errorf("Bootstrap() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr != nil {
 				return
 			}
 

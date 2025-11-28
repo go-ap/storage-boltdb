@@ -821,6 +821,8 @@ func (r *repo) close() error {
 	return err
 }
 
+const dbFile = "storage.bdb"
+
 func fullPath(base *string) (string, error) {
 	if !filepath.IsAbs(*base) {
 		*base, _ = filepath.Abs(*base)
@@ -828,7 +830,7 @@ func fullPath(base *string) (string, error) {
 	if err := mkDirIfNotExists(*base); err != nil {
 		return "", err
 	}
-	p := filepath.Join(*base, "storage.bdb")
+	p := filepath.Join(*base, dbFile)
 	return p, nil
 }
 

@@ -68,11 +68,11 @@ func Test_repo_LoadAccess(t *testing.T) {
 func Test_repo_LoadXXX_with_brokenDecode(t *testing.T) {
 	wantErr := errors.Newf("broken")
 
+	rr := mockRepo(t, fields{path: t.TempDir()}, withOpenRoot, withMockItems, withMetadataJDoe, withClient, withAuthorization, withAccess)
 	oldDecode := decodeFn
 	decodeFn = func(_ []byte, m any) error {
 		return wantErr
 	}
-	rr := mockRepo(t, fields{path: t.TempDir()}, withOpenRoot, withClient, withAuthorization, withAccess)
 	t.Cleanup(func() {
 		rr.Close()
 		decodeFn = oldDecode
@@ -103,6 +103,27 @@ func Test_repo_LoadXXX_with_brokenDecode(t *testing.T) {
 		_, err := rr.LoadRefresh("refresh-666")
 		if !cmp.Equal(err, wantErr, EquateWeakErrors) {
 			t.Errorf("LoadRefresh() error = %v, wantErr %v", err, wantErr)
+		}
+	})
+
+	t.Run("LoadMetadata", func(t *testing.T) {
+		err := rr.LoadMetadata("https://example.com/~jdoe", Metadata{Pw: []byte("asd"), PrivateKey: pkcs8Pk})
+		if !errors.Is(err, wantErr) {
+			t.Errorf("LoadMetadata() error = %v, wantErr %v", err, wantErr)
+		}
+	})
+
+	t.Run("LoadKey", func(t *testing.T) {
+		_, err := rr.LoadKey("https://example.com/~jdoe")
+		if !errors.Is(err, wantErr) {
+			t.Errorf("LoadKey() error = %v, wantErr %v", err, wantErr)
+		}
+	})
+
+	t.Run("PasswordCheck", func(t *testing.T) {
+		err := rr.PasswordCheck("https://example.com/~jdoe", []byte("asd"))
+		if !errors.Is(err, wantErr) {
+			t.Errorf("PasswordCheck() error = %v, wantErr %v", err, wantErr)
 		}
 	})
 }
@@ -307,11 +328,11 @@ func Test_repo_RemoveRefresh(t *testing.T) {
 func Test_repo_SaveXXX_with_brokenEncode(t *testing.T) {
 	wantErr := errors.Newf("broken")
 
+	rr := mockRepo(t, fields{path: t.TempDir()}, withOpenRoot, withMockItems)
 	oldEncode := encodeFn
 	encodeFn = func(v any) ([]byte, error) {
 		return nil, wantErr
 	}
-	rr := mockRepo(t, fields{path: t.TempDir()}, withOpenRoot)
 	t.Cleanup(func() {
 		rr.Close()
 		encodeFn = oldEncode
@@ -335,6 +356,27 @@ func Test_repo_SaveXXX_with_brokenEncode(t *testing.T) {
 		err := rr.SaveAccess(mockAccess("test-access", defaultClient))
 		if !cmp.Equal(err, wantErr, EquateWeakErrors) {
 			t.Errorf("SaveAccess() error = %v, wantErr %v", err, wantErr)
+		}
+	})
+
+	t.Run("SaveMetadata", func(t *testing.T) {
+		err := rr.SaveMetadata("https://example.com/~jdoe", Metadata{Pw: []byte("asd"), PrivateKey: pkcs8Pk})
+		if !cmp.Equal(err, wantErr, EquateWeakErrors) {
+			t.Errorf("SaveMetadata() error = %v, wantErr %v", err, wantErr)
+		}
+	})
+
+	t.Run("PasswordSet", func(t *testing.T) {
+		err := rr.PasswordSet("https://example.com/~jdoe", []byte("dsa"))
+		if !cmp.Equal(err, wantErr, EquateWeakErrors) {
+			t.Errorf("PasswordSet() error = %v, wantErr %v", err, wantErr)
+		}
+	})
+
+	t.Run("SaveKey", func(t *testing.T) {
+		_, err := rr.SaveKey("https://example.com/~jdoe", pk)
+		if !cmp.Equal(err, wantErr, EquateWeakErrors) {
+			t.Errorf("SaveKey() error = %v, wantErr %v", err, wantErr)
 		}
 	})
 }

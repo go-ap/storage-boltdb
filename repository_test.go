@@ -15,7 +15,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-func TestNew(t *testing.T) {
+func Test_New(t *testing.T) {
 	dir := os.TempDir()
 
 	conf := Config{
@@ -223,8 +223,6 @@ func withCollectionHavingItems(r *repo) *repo {
 	}
 	return r
 }
-
-var withJdoeInbox = withOrderedCollection("https://example.com/~jdoe/inbox")
 
 func withItems(items ...vocab.Item) initFn {
 	return func(r *repo) *repo {
