@@ -1,8 +1,6 @@
 package boltdb
 
 import (
-	"bytes"
-	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -33,9 +31,15 @@ func Test_repo_LoadAccess(t *testing.T) {
 		wantErr  error
 	}{
 		{
-			name:    "empty",
+			name:    "not open",
 			fields:  fields{},
-			wantErr: errors.NotFoundf("Empty access code"),
+			wantErr: errNotOpen,
+		},
+		{
+			name:     "empty",
+			fields:   fields{},
+			setupFns: []initFn{withOpenRoot},
+			wantErr:  errors.NotFoundf("Empty access code"),
 		},
 		{
 			name:     "load access",
@@ -435,10 +439,8 @@ func Test_repo_SaveAuthorize(t *testing.T) {
 				}
 				return
 			}
-			gotJson, _ := json.Marshal(got)
-			wantJson, _ := json.Marshal(tt.auth)
-			if !bytes.Equal(gotJson, wantJson) {
-				t.Errorf("SaveAuthorize() got =\n%s\n====\n%s", gotJson, wantJson)
+			if !cmp.Equal(got, tt.auth) {
+				t.Errorf("SaveAuthorize() diff %s", cmp.Diff(got, tt.auth))
 			}
 		})
 	}
@@ -481,10 +483,8 @@ func Test_repo_LoadAuthorize(t *testing.T) {
 				}
 				return
 			}
-			gotJson, _ := json.Marshal(got)
-			wantJson, _ := json.Marshal(tt.want)
-			if !bytes.Equal(gotJson, wantJson) {
-				t.Errorf("LoadAuthorize() got =\n%s\n====\n%s", gotJson, wantJson)
+			if !cmp.Equal(got, tt.want) {
+				t.Errorf("LoadAuthorize() diff %s", cmp.Diff(got, tt.want))
 			}
 		})
 	}

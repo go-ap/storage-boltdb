@@ -374,6 +374,9 @@ func (r *repo) SaveAccess(data *osin.AccessData) error {
 // AuthorizeData and AccessData DON'T NEED to be loaded if not easily available.
 // Optionally can return error if expired.
 func (r *repo) LoadAccess(code string) (*osin.AccessData, error) {
+	if r == nil || r.d == nil {
+		return nil, errNotOpen
+	}
 	if code == "" {
 		return nil, errors.NotFoundf("Empty access code")
 	}
