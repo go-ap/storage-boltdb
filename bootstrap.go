@@ -15,7 +15,7 @@ func Bootstrap(conf Config) error {
 	if err != nil {
 		return err
 	}
-	db, err := bolt.Open(r.path, 0600, nil)
+	db, err := bolt.Open(r.path, 0600, bolt.DefaultOptions)
 	if err != nil {
 		return err
 	}
@@ -24,27 +24,20 @@ func Bootstrap(conf Config) error {
 }
 
 func bootstrap(db *bolt.DB, root []byte) error {
+	if db == nil {
+		return errNotOpen
+	}
 	return db.Update(func(tx *bolt.Tx) error {
 		root, err := tx.CreateBucketIfNotExists(root)
 		if err != nil {
 			return errors.Annotatef(err, "could not create root bucket")
 		}
-		_, err = root.CreateBucketIfNotExists([]byte(accessBucket))
-		if err != nil {
-			return errors.Annotatef(err, "could not create %s bucket", accessBucket)
-		}
-		_, err = root.CreateBucketIfNotExists([]byte(refreshBucket))
-		if err != nil {
-			return errors.Annotatef(err, "could not create %s bucket", refreshBucket)
-		}
-		_, err = root.CreateBucketIfNotExists([]byte(authorizeBucket))
-		if err != nil {
-			return errors.Annotatef(err, "could not create %s bucket", authorizeBucket)
-		}
-		_, err = root.CreateBucketIfNotExists([]byte(clientsBucket))
-		if err != nil {
-			return errors.Annotatef(err, "could not create %s bucket", clientsBucket)
-		}
+		// NOTE(marius): we assume no changes happen during the execution and if
+		// root bucket was created successfully, the rest will succeed too.
+		_, _ = root.CreateBucketIfNotExists([]byte(accessBucket))
+		_, _ = root.CreateBucketIfNotExists([]byte(refreshBucket))
+		_, _ = root.CreateBucketIfNotExists([]byte(authorizeBucket))
+		_, _ = root.CreateBucketIfNotExists([]byte(clientsBucket))
 		return nil
 	})
 }

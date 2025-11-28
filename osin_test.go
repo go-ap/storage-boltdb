@@ -520,3 +520,40 @@ func Test_repo_SaveAccess(t *testing.T) {
 		})
 	}
 }
+
+func Test_repo_ListClients(t *testing.T) {
+	tests := []struct {
+		name     string
+		fields   fields
+		setupFns []initFn
+		want     []osin.Client
+		wantErr  error
+	}{
+		{
+			name:    "empty",
+			fields:  fields{},
+			wantErr: errNotOpen,
+		},
+		{
+			name:     "empty",
+			setupFns: []initFn{withOpenRoot, withClient},
+			fields:   fields{path: t.TempDir()},
+			want:     []osin.Client{defaultClient},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := mockRepo(t, tt.fields, tt.setupFns...)
+			t.Cleanup(r.Close)
+
+			got, err := r.ListClients()
+			if !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
+				t.Errorf("ListClients() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ListClients() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

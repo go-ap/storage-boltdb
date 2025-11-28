@@ -15,5 +15,5 @@ tasks:
       go test -tags conformance -count=1 -json . | go run github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt -showteststatus
   - coverage: |
       set -a +x
-      cd storage-boltdb && make coverage
-      go run github.com/mattn/goveralls@latest -coverprofile=storage-boltdb.coverprofile -service=sourcehut -repotokenfile ~/.coveralls.tok
+      cd storage-boltdb
+      go run github.com/mattn/goveralls@latest -tags conformance -service=sourcehut -repotokenfile ~/.coveralls.tok

@@ -502,7 +502,64 @@ func Test_repo_AddTo(t *testing.T) {
 	}
 }
 
+func Test_repo_Load_UnhappyPath(t *testing.T) {
+	type args struct {
+		iri vocab.IRI
+		fil filters.Checks
+	}
+	tests := []struct {
+		name     string
+		args     args
+		setupFns []initFn
+		want     vocab.Item
+		wantErr  error
+	}{
+		{
+			name:    "not opened",
+			wantErr: errNotOpen,
+		},
+		{
+			name:     "empty",
+			setupFns: []initFn{withOpenRoot},
+			wantErr:  errors.NotFoundf("file not found"),
+		},
+		{
+			name:     "empty iri gives us not found",
+			setupFns: []initFn{withOpenRoot},
+			wantErr:  errors.NotFoundf("file not found"),
+		},
+		{
+			name:     "not bootstrapped",
+			args:     args{iri: "https://example.com"},
+			setupFns: []initFn{withOpenRoot},
+			wantErr:  ErrorInvalidRoot(nil),
+		},
+		{
+			name:     "invalid iri gives 404",
+			args:     args{iri: "https://example.com/dsad"},
+			setupFns: []initFn{withOpenRoot, withBootstrap},
+			wantErr:  errors.NotFoundf("example.com not found"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := mockRepo(t, fields{path: t.TempDir()}, tt.setupFns...)
+			t.Cleanup(r.Close)
+
+			got, err := r.Load(tt.args.iri, tt.args.fil...)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("Load() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !vocab.ItemsEqual(got, tt.want) {
+				t.Errorf("Load() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_repo_Load(t *testing.T) {
+	// NOTE(marius): happy path tests for a fully mocked repo
 	r := mockRepo(t, fields{path: t.TempDir()}, withOpenRoot, withGeneratedMocks)
 	t.Cleanup(r.Close)
 

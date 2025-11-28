@@ -1,6 +1,7 @@
 package boltdb
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -36,6 +37,11 @@ func TestBootstrap(t *testing.T) {
 		{
 			name: "temp",
 			arg:  Config{Path: filepath.Join(t.TempDir())},
+		},
+		{
+			name:    "deeper than forbidden",
+			arg:     Config{Path: filepath.Join(forbiddenPath, "should-fail")},
+			wantErr: &fs.PathError{Op: "stat", Path: filepath.Join(forbiddenPath, "should-fail"), Err: syscall.EACCES},
 		},
 		{
 			name:    "forbidden",
@@ -92,6 +98,7 @@ func TestBootstrap(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
+	forbiddenPath := createForbiddenDir(t)
 	tests := []struct {
 		name    string
 		arg     Config
@@ -117,11 +124,58 @@ func TestClean(t *testing.T) {
 			arg:     Config{Path: os.DevNull},
 			wantErr: errors.Errorf("path exists, and is not a folder %s", os.DevNull),
 		},
+		{
+			name:    "deeper than forbidden",
+			arg:     Config{Path: filepath.Join(forbiddenPath, "should-fail")},
+			wantErr: &fs.PathError{Op: "stat", Path: filepath.Join(forbiddenPath, "should-fail"), Err: syscall.EACCES},
+		},
+		{
+			name:    "forbidden",
+			arg:     Config{Path: forbiddenPath},
+			wantErr: &fs.PathError{Op: "open", Path: filepath.Join(forbiddenPath, dbFile), Err: syscall.EACCES},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := Clean(tt.arg); !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
 				t.Errorf("Clean() error = %s", cmp.Diff(tt.wantErr, err, EquateWeakErrors))
+			}
+		})
+	}
+}
+
+func Test_bootstrap(t *testing.T) {
+	noRoot, err := bolt.Open(filepath.Join(t.TempDir(), "/no-root.bdb"), 0x600, &bolt.Options{ReadOnly: false})
+	if err != nil {
+		t.Errorf("failed opening boltdb: %s", err)
+	}
+	type args struct {
+		db   *bolt.DB
+		root []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr error
+	}{
+		{
+			name:    "empty",
+			args:    args{},
+			wantErr: errNotOpen,
+		},
+		{
+			name: "no root bucket",
+			args: args{
+				db:   noRoot,
+				root: nil,
+			},
+			wantErr: errors.Annotatef(fmt.Errorf("bucket name required"), "could not create root bucket"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := bootstrap(tt.args.db, tt.args.root); !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
+				t.Errorf("bootstrap() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
