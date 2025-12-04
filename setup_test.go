@@ -88,26 +88,26 @@ func mockRepo(t *testing.T, f fields, initFns ...initFn) *repo {
 	}
 
 	for _, fn := range initFns {
-		_ = fn(r)
+		_ = fn(t, r)
 	}
 	return r
 }
 
-type initFn func(*repo) *repo
+type initFn func(*testing.T, *repo) *repo
 
-func withBootstrap(r *repo) *repo {
+func withBootstrap(t *testing.T, r *repo) *repo {
 	if err := bootstrap(r.d, []byte(rootBucket)); err != nil {
-		r.errFn("unable to bootstrap BoltDB: %s", err)
+		t.Errorf("unable to bootstrap BoltDB: %s", err)
 	}
 	return r
 }
 
-func withOpenRoot(r *repo) *repo {
+func withOpenRoot(t *testing.T, r *repo) *repo {
 	var err error
 	r.d, err = bolt.Open(r.path, 0600, nil)
 	r.root = []byte(rootBucket)
 	if err != nil {
-		r.errFn("Could not open db %s: %s", r.path, err)
+		t.Errorf("Could not open db %s: %s", r.path, err)
 	}
 	return r
 }
@@ -147,23 +147,23 @@ var (
 	encPw, _ = bcrypt.GenerateFromPassword(defaultPw, bcrypt.DefaultCost)
 )
 
-func withMockItems(r *repo) *repo {
+func withMockItems(t *testing.T, r *repo) *repo {
 	for _, it := range mockItems {
 		if _, err := save(r, it); err != nil {
-			r.errFn("unable to save item: %s: %s", it.GetLink(), err)
+			t.Errorf("unable to save item: %s: %s", it.GetLink(), err)
 		}
 	}
 	return r
 }
 
-func withMetadataJDoe(r *repo) *repo {
+func withMetadataJDoe(t *testing.T, r *repo) *repo {
 	m := Metadata{
 		Pw:         encPw,
 		PrivateKey: key,
 	}
 
 	if err := r.SaveMetadata("https://example.com/~jdoe", m); err != nil {
-		r.errFn("unable to save metadata for jdoe: %s", err)
+		t.Errorf("unable to save metadata for jdoe: %s", err)
 	}
 	return r
 }
@@ -213,26 +213,26 @@ func mockAccess(code string, cl osin.Client) *osin.AccessData {
 	return ad
 }
 
-func withClient(r *repo) *repo {
+func withClient(t *testing.T, r *repo) *repo {
 	if err := r.CreateClient(defaultClient); err != nil {
-		r.errFn("failed to create client: %s", err)
+		t.Errorf("failed to create client: %s", err)
 	}
 	return r
 }
 
-func withAuthorization(r *repo) *repo {
+func withAuthorization(t *testing.T, r *repo) *repo {
 	if err := r.SaveAuthorize(mockAuth("test-code", defaultClient)); err != nil {
-		r.errFn("failed to create authorization data: %s", err)
+		t.Errorf("failed to create authorization data: %s", err)
 	}
 	return r
 }
 
-func withAccess(r *repo) *repo {
+func withAccess(t *testing.T, r *repo) *repo {
 	if err := r.SaveAccess(mockAccess("refresh-666", defaultClient)); err != nil {
-		r.errFn("failed to create access data: %s", err)
+		t.Errorf("failed to create access data: %s", err)
 	}
 	if err := r.SaveAccess(mockAccess("access-666", defaultClient)); err != nil {
-		r.errFn("failed to create access data: %s", err)
+		t.Errorf("failed to create access data: %s", err)
 	}
 	return r
 }
@@ -259,19 +259,19 @@ var (
 )
 
 func withGeneratedRoot(root vocab.Item) initFn {
-	return func(r *repo) *repo {
+	return func(t *testing.T, r *repo) *repo {
 		if _, err := r.Save(root); err != nil {
-			r.errFn("unable to save root service: ", err)
+			t.Errorf("unable to save root service: %s", err)
 		}
 		return r
 	}
 }
 
 func withGeneratedItems(items vocab.ItemCollection) initFn {
-	return func(r *repo) *repo {
+	return func(t *testing.T, r *repo) *repo {
 		for _, it := range items {
 			if _, err := save(r, it); err != nil {
-				r.errFn("unable to save %T[%s]: %err", it, it.GetLink, err)
+				t.Errorf("unable to save %T[%s]: %s", it, it.GetLink(), err)
 			}
 		}
 		return r
@@ -279,9 +279,11 @@ func withGeneratedItems(items vocab.ItemCollection) initFn {
 }
 
 func withActivitiesToCollections(activities vocab.ItemCollection) initFn {
-	return func(r *repo) *repo {
+	return func(t *testing.T, r *repo) *repo {
 		collectionIRI := vocab.Outbox.IRI(root)
-		_ = r.AddTo(collectionIRI, activities...)
+		if err := r.AddTo(collectionIRI, activities...); err != nil {
+			t.Errorf("unable to addactivities to collection %s: %s", collectionIRI, err)
+		}
 		return r
 	}
 }
@@ -300,9 +302,9 @@ func createActivity(ob vocab.Item, attrTo vocab.Item) *vocab.Activity {
 	return act
 }
 
-func withGeneratedMocks(r *repo) *repo {
+func withGeneratedMocks(t *testing.T, r *repo) *repo {
 	idSetter := setId(rootIRI)
-	r = withGeneratedRoot(root)(r)
+	r = withGeneratedRoot(root)(t, r)
 
 	actors := make(vocab.ItemCollection, 0, 20)
 	for range cap(actors) - 1 {
@@ -313,7 +315,7 @@ func withGeneratedMocks(r *repo) *repo {
 		})
 		_ = actors.Append(actor)
 	}
-	r = withGeneratedItems(actors)(r)
+	r = withGeneratedItems(actors)(t, r)
 	allActors.Store(&actors)
 
 	objects := make(vocab.ItemCollection, 0, 50)
@@ -335,7 +337,7 @@ func withGeneratedMocks(r *repo) *repo {
 		})
 		_ = creates.Append(create)
 	}
-	r = withGeneratedItems(objects)(r)
+	r = withGeneratedItems(objects)(t, r)
 	allObjects.Store(&objects)
 
 	activities := make(vocab.ItemCollection, 0, cap(actors)*10)
@@ -352,8 +354,8 @@ func withGeneratedMocks(r *repo) *repo {
 		_ = activities.Append(activity)
 	}
 	activities = append(creates, activities...)
-	r = withGeneratedItems(activities)(r)
-	r = withActivitiesToCollections(activities)(r)
+	r = withGeneratedItems(activities)(t, r)
+	r = withActivitiesToCollections(activities)(t, r)
 
 	allActivities.Store(&activities)
 	return r
