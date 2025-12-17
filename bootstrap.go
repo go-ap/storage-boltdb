@@ -47,14 +47,5 @@ func Clean(conf Config) error {
 	if err != nil {
 		return err
 	}
-	db, err := bolt.Open(path, 0600, bolt.DefaultOptions)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	return db.Update(func(tx *bolt.Tx) error {
-		_ = tx.DeleteBucket([]byte(rootBucket))
-		return nil
-	})
+	return os.RemoveAll(path)
 }

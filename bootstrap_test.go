@@ -132,7 +132,7 @@ func TestClean(t *testing.T) {
 		{
 			name:    "forbidden",
 			arg:     Config{Path: forbiddenPath},
-			wantErr: &fs.PathError{Op: "open", Path: filepath.Join(forbiddenPath, dbFile), Err: syscall.EACCES},
+			wantErr: &fs.PathError{Op: "open", Path: forbiddenPath, Err: syscall.EACCES},
 		},
 	}
 	for _, tt := range tests {
@@ -176,6 +176,9 @@ func Test_bootstrap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := bootstrap(tt.args.db, tt.args.root); !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
 				t.Errorf("bootstrap() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.args.db != nil {
+				_ = tt.args.db.Close()
 			}
 		})
 	}
