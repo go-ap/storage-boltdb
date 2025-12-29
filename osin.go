@@ -72,8 +72,7 @@ func (r *repo) Clone() osin.Storage {
 
 // Close closes the boltdb database if possible.
 func (r *repo) Close() {
-	err := r.close()
-	if err != nil {
+	if err := r.close(); err != nil {
 		r.errFn("error closing: %+s", err)
 	}
 }

@@ -799,26 +799,23 @@ func (r *repo) Open() error {
 	if r == nil {
 		return errors.Newf("Unable to open uninitialized db")
 	}
-	if r.d == nil {
-		var err error
-		r.d, err = bolt.Open(r.path, 0600, nil)
-		if err != nil {
-			return err
-		}
+	db, err := bolt.Open(r.path, 0600, nil)
+	if err == nil {
+		r.d = db
 	}
-	return nil
+	return err
 }
 
 func (r *repo) close() error {
 	if r == nil {
 		return errors.Newf("Unable to close uninitialized db")
 	}
-	if r.d == nil {
-		return nil
+	if r.d != nil {
+		if err := r.d.Close(); err != nil {
+			r.errFn("error closing the boltdb: %+s", err)
+		}
 	}
-	err := r.d.Close()
-	r.d = nil
-	return err
+	return nil
 }
 
 const dbFile = "storage.bdb"
