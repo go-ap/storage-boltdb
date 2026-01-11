@@ -209,7 +209,7 @@ func (r *repo) loadOneFromBucket(iri vocab.IRI, ff ...filters.Check) (vocab.Item
 var orderedCollectionTypes = vocab.ActivityVocabularyTypes{vocab.OrderedCollectionPageType, vocab.OrderedCollectionType}
 var collectionTypes = vocab.ActivityVocabularyTypes{vocab.CollectionPageType, vocab.CollectionType}
 
-func (r *repo) iterateInBucket(b *bolt.Bucket, _ vocab.IRI, ff ...filters.Check) (vocab.Item, uint, error) {
+func (r *repo) iterateInBucket(b *bolt.Bucket, iri vocab.IRI, ff ...filters.Check) (vocab.Item, uint, error) {
 	if b == nil {
 		return nil, 0, errors.Errorf("invalid bucket to load from")
 	}
@@ -798,6 +798,9 @@ func (r *repo) Delete(it vocab.Item) error {
 func (r *repo) Open() error {
 	if r == nil {
 		return errors.Newf("Unable to open uninitialized db")
+	}
+	if r.d != nil {
+		return nil
 	}
 	db, err := bolt.Open(r.path, 0600, nil)
 	if err == nil {
