@@ -34,45 +34,17 @@ func (r *repo) PasswordSet(iri vocab.IRI, pw []byte) error {
 		return errors.NotFoundf("not found")
 	}
 
-	err := r.d.Update(func(tx *bolt.Tx) error {
-		root, err := tx.CreateBucketIfNotExists(r.root)
-		if err != nil {
-			return errors.Errorf("Not able to write to root bucket %s", r.root)
-		}
-		if root == nil {
-			return ErrorInvalidRoot(r.root)
-		}
-		if !root.Writable() {
-			return errors.Errorf("Non writeable bucket %s", r.root)
-		}
-		var b *bolt.Bucket
-		b, _, err = descendInBucket(root, path, true)
-		if err != nil {
-			return errors.Newf("Unable to find %s in root bucket", path)
-		}
-		if !b.Writable() {
-			return errors.Errorf("Non writeable bucket %s", path)
-		}
+	m := new(Metadata)
+	if err := r.LoadMetadata(iri, m); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
 
-		pw, err = bcrypt.GenerateFromPassword(pw, -1)
-		if err != nil {
-			return errors.Annotatef(err, "Could not encrypt the pw")
-		}
-		m := Metadata{
-			Pw: pw,
-		}
-		entryBytes, err := encodeFn(m)
-		if err != nil {
-			return errors.Annotatef(err, "Could not marshal metadata")
-		}
-		err = b.Put([]byte(metaDataKey), entryBytes)
-		if err != nil {
-			return errors.Errorf("Could not insert entry: %s", err)
-		}
-		return nil
-	})
-
-	return err
+	var err error
+	m.Pw, err = bcrypt.GenerateFromPassword(pw, -1)
+	if err != nil {
+		return errors.Annotatef(err, "Could not encrypt the pw")
+	}
+	return r.SaveMetadata(iri, m)
 }
 
 // PasswordCheck
