@@ -817,6 +817,7 @@ func (r *repo) close() error {
 		if err := r.d.Close(); err != nil {
 			r.errFn("error closing the boltdb: %+s", err)
 		}
+		r.d = nil
 	}
 	return nil
 }
