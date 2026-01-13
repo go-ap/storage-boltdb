@@ -42,7 +42,7 @@ func (r *repo) PasswordSet(iri vocab.IRI, pw []byte) error {
 	var err error
 	m.Pw, err = bcrypt.GenerateFromPassword(pw, -1)
 	if err != nil {
-		return errors.Annotatef(err, "Could not encrypt the pw")
+		return errors.Annotatef(err, "Could not generate password hash")
 	}
 	return r.SaveMetadata(iri, m)
 }
