@@ -3,14 +3,14 @@ module github.com/go-ap/storage-boltdb
 go 1.25
 
 require (
-	github.com/go-ap/activitypub v0.0.0-20260102112410-54375d828154
+	github.com/go-ap/activitypub v0.0.0-20260115125301-2f2cfaf37392
 	github.com/go-ap/errors v0.0.0-20251229095444-2702aa2d8569
-	github.com/go-ap/filters v0.0.0-20260102113139-8ad00475b09e
+	github.com/go-ap/filters v0.0.0-20260115130515-78150e49c9d3
 	github.com/go-ap/storage-conformance-suite v0.0.0-20260107120635-5332e51eadc5
 	github.com/google/go-cmp v0.7.0
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.4.3
-	golang.org/x/crypto v0.46.0
+	golang.org/x/crypto v0.47.0
 )
 
 require (
@@ -39,7 +39,7 @@ require (
 	github.com/valyala/fastjson v1.6.7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/term v0.38.0 // indirect
+	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	gopkg.in/neurosnap/sentences.v1 v1.0.7 // indirect
 )
