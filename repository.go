@@ -92,18 +92,19 @@ func (r *repo) loadItem(b *bolt.Bucket, ff ...filters.Check) (vocab.Item, error)
 			return nil, errors.NotFoundf("not found")
 		}
 	}
-	typ := it.GetType()
-	if vocab.ActorTypes.Contains(typ) {
-		_ = vocab.OnActor(it, loadFilteredPropsForActor(r, ff...))
-	}
-	if vocab.ObjectTypes.Contains(typ) {
-		_ = vocab.OnObject(it, loadFilteredPropsForObject(r, ff...))
-	}
-	if vocab.IntransitiveActivityTypes.Contains(typ) {
-		_ = vocab.OnIntransitiveActivity(it, loadFilteredPropsForIntransitiveActivity(r, ff...))
-	}
-	if vocab.ActivityTypes.Contains(typ) {
-		_ = vocab.OnActivity(it, loadFilteredPropsForActivity(r, ff...))
+	if typ := it.GetType(); typ != nil {
+		if vocab.ActorTypes.Match(typ) {
+			_ = vocab.OnActor(it, loadFilteredPropsForActor(r, ff...))
+		}
+		if vocab.ObjectTypes.Match(typ) {
+			_ = vocab.OnObject(it, loadFilteredPropsForObject(r, ff...))
+		}
+		if vocab.IntransitiveActivityTypes.Match(typ) {
+			_ = vocab.OnIntransitiveActivity(it, loadFilteredPropsForIntransitiveActivity(r, ff...))
+		}
+		if vocab.ActivityTypes.Match(typ) {
+			_ = vocab.OnActivity(it, loadFilteredPropsForActivity(r, ff...))
+		}
 	}
 	return it, nil
 }
@@ -257,7 +258,7 @@ func (r *repo) iterateInBucket(b *bolt.Bucket, iri vocab.IRI, ff ...filters.Chec
 		}
 	}
 
-	if orderedCollectionTypes.Contains(col.GetType()) {
+	if orderedCollectionTypes.Match(col.GetType()) {
 		err = vocab.OnOrderedCollection(col, buildOrderedCollection(items))
 	} else {
 		err = vocab.OnCollection(col, buildCollection(items))
@@ -521,7 +522,7 @@ func createCollectionsInBucket(b *bolt.Bucket, it vocab.Item) error {
 		return nil
 	}
 	// create collections
-	if vocab.ActorTypes.Contains(it.GetType()) {
+	if typ := it.GetType(); typ != nil && vocab.ActorTypes.Match(typ) {
 		_ = vocab.OnActor(it, func(p *vocab.Actor) error {
 			if p.Inbox != nil {
 				p.Inbox, _ = createCollectionInBucket(b, vocab.Inbox.IRI(p), p)

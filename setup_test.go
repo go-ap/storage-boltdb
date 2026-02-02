@@ -361,6 +361,16 @@ func withGeneratedMocks(t *testing.T, r *repo) *repo {
 	return r
 }
 
+func typeToString(typ vocab.Typer) string {
+	if tt, ok := typ.(vocab.ActivityVocabularyType); ok {
+		return string(tt)
+	}
+	if tt, ok := typ.(vocab.ActivityVocabularyTypes); ok && len(tt) > 0 {
+		return string(tt[0])
+	}
+	return "unknown"
+}
+
 func setId(base vocab.IRI) func(ob *vocab.Object) error {
 	idMap := sync.Map{}
 	return func(ob *vocab.Object) error {
@@ -369,7 +379,7 @@ func setId(base vocab.IRI) func(ob *vocab.Object) error {
 		if latestId, ok := idMap.Load(typ); ok {
 			id = latestId.(int) + 1
 		}
-		ob.ID = base.AddPath(strings.ToLower(string(typ))).AddPath(strconv.Itoa(id))
+		ob.ID = base.AddPath(strings.ToLower(typeToString(typ))).AddPath(strconv.Itoa(id))
 		idMap.Store(typ, id)
 		return nil
 	}
