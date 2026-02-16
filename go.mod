@@ -6,11 +6,11 @@ require (
 	github.com/go-ap/activitypub v0.0.0-20260208110334-902f6cf8c2cc
 	github.com/go-ap/errors v0.0.0-20260208110149-e1b309365966
 	github.com/go-ap/filters v0.0.0-20260208110534-2b07661eb286
-	github.com/go-ap/storage-conformance-suite v0.0.0-20260202151441-bcd32bc22076
+	github.com/go-ap/storage-conformance-suite v0.0.0-20260216100252-be23608e4df4
 	github.com/google/go-cmp v0.7.0
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.4.3
-	golang.org/x/crypto v0.47.0
+	golang.org/x/crypto v0.48.0
 )
 
 require (
@@ -38,9 +38,9 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/valyala/fastjson v1.6.7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/term v0.39.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/term v0.40.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	gopkg.in/neurosnap/sentences.v1 v1.0.7 // indirect
 )
 
