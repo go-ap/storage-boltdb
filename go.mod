@@ -3,10 +3,10 @@ module github.com/go-ap/storage-boltdb
 go 1.25
 
 require (
-	github.com/go-ap/activitypub v0.0.0-20260208110334-902f6cf8c2cc
+	github.com/go-ap/activitypub v0.0.0-20260217161652-7bec47e1f870
 	github.com/go-ap/errors v0.0.0-20260208110149-e1b309365966
-	github.com/go-ap/filters v0.0.0-20260208110534-2b07661eb286
-	github.com/go-ap/storage-conformance-suite v0.0.0-20260216121155-e41e61167737
+	github.com/go-ap/filters v0.0.0-20260304093742-67453e8a9d1a
+	github.com/go-ap/storage-conformance-suite v0.0.0-20260224104644-d108133388c0
 	github.com/google/go-cmp v0.7.0
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.4.3
@@ -36,12 +36,13 @@ require (
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/valyala/fastjson v1.6.7 // indirect
+	github.com/valyala/fastjson v1.6.10 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/term v0.40.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	gopkg.in/neurosnap/sentences.v1 v1.0.7 // indirect
+	quamina.net/go/quamina v1.5.2-0.20260219224429-4b74c3864009 // indirect
 )
 
 tool github.com/mfridman/tparse
