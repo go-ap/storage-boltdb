@@ -643,12 +643,12 @@ func Test_repo_Load(t *testing.T) {
 				iri: rootOutboxIRI,
 				fil: filters.Checks{
 					filters.HasType(vocab.CreateType),
-					filters.Object(filters.Tag(filters.NilID)),
+					filters.Object(filters.Tag(filters.NilItem)),
 				},
 			},
 			want: wantsRootOutbox(
 				filters.HasType(vocab.CreateType),
-				filters.Object(filters.Tag(filters.NilID)),
+				filters.Object(filters.Tag(filters.NilItem)),
 			),
 		},
 		{

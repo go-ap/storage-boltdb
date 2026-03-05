@@ -77,11 +77,21 @@ func loadRawItemFromBucket(b *bolt.Bucket) (vocab.Item, error) {
 	return it, nil
 }
 
-func (r *repo) loadItem(tx *bolt.Tx, b *bolt.Bucket, ff ...filters.Check) (vocab.Item, error) {
+func (r *repo) loadItem(tx *bolt.Tx, b *bolt.Bucket, matcherFn func([]byte) bool, ff ...filters.Check) (vocab.Item, error) {
 	// we have found an item
-	it, err := loadRawItemFromBucket(b)
+	raw := b.Get([]byte(objectKey))
+	if raw == nil {
+		return nil, errors.NotFoundf("not found")
+	}
+	if matcherFn != nil && !matcherFn(raw) {
+		return nil, errors.NotFoundf("not found")
+	}
+	it, err := decodeItemFn(raw)
 	if err != nil {
 		return nil, err
+	}
+	if vocab.IsNil(it) {
+		return nil, errors.NotFoundf("not found")
 	}
 	if it.IsCollection() {
 		// we need to dereference them, so no further filtering/processing is needed here
@@ -169,6 +179,7 @@ func (r *repo) loadItemsElementsTx(tx *bolt.Tx, iris []vocab.Item, ff ...filters
 		return nil, ErrorInvalidRoot(r.root)
 	}
 	var err error
+	matcherFn := filters.RawMatcher(ff)
 	for _, iri := range iris {
 		var b *bolt.Bucket
 		remainderPath := itemBucketPath(iri.GetLink())
@@ -176,7 +187,7 @@ func (r *repo) loadItemsElementsTx(tx *bolt.Tx, iris []vocab.Item, ff ...filters
 		if err != nil || b == nil {
 			continue
 		}
-		it, err := r.loadItem(tx, b, ff...)
+		it, err := r.loadItem(tx, b, matcherFn)
 		if err != nil || vocab.IsNil(it) {
 			continue
 		}
@@ -311,7 +322,7 @@ func (r *repo) loadFromBucket(tx *bolt.Tx, iri vocab.IRI, ff ...filters.Check) (
 	}
 	if len(remainderPath) == 0 {
 		// we have found an item
-		it, err = r.loadItem(tx, b)
+		it, err = r.loadItem(tx, b, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -707,7 +718,6 @@ func buildCollection(items vocab.ItemCollection) vocab.WithCollectionFn {
 		if len(items) > 0 {
 			col.Items = items
 		}
-		col.TotalItems = uint(len(items))
 		return nil
 	}
 }
@@ -717,7 +727,6 @@ func buildOrderedCollection(items vocab.ItemCollection) vocab.WithOrderedCollect
 		if len(items) > 0 {
 			col.OrderedItems = items
 		}
-		col.TotalItems = uint(len(items))
 		return nil
 	}
 }
