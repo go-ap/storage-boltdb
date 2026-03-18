@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/go-ap/activitypub v0.0.0-20260314162927-f37166117816
 	github.com/go-ap/errors v0.0.0-20260208110149-e1b309365966
-	github.com/go-ap/filters v0.0.0-20260314171937-f049bd20de96
+	github.com/go-ap/filters v0.0.0-20260318092102-3b81ed7315b1
 	github.com/go-ap/storage-conformance-suite v0.0.0-20260224104644-d108133388c0
 	github.com/google/go-cmp v0.7.0
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
@@ -42,7 +42,7 @@ require (
 	golang.org/x/term v0.41.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	gopkg.in/neurosnap/sentences.v1 v1.0.7 // indirect
-	quamina.net/go/quamina v1.5.2-0.20260306081357-88daf10bf1dc // indirect
+	quamina.net/go/quamina/v2 v2.0.2 // indirect
 )
 
 tool github.com/mfridman/tparse
