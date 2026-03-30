@@ -415,7 +415,7 @@ func Test_repo_AddTo(t *testing.T) {
 			setupFns: []initFn{withOpenRoot, withOrderedCollectionHavingItems},
 			args: args{
 				colIRI: "https://example.com/followers",
-				it:     vocab.IRI("https://example.com"),
+				it:     vocab.Object{ID: "https://example.com"},
 			},
 			wantErr: nil,
 		},
@@ -425,7 +425,7 @@ func Test_repo_AddTo(t *testing.T) {
 			setupFns: []initFn{withOpenRoot, withBootstrap, withCollectionHavingItems},
 			args: args{
 				colIRI: "https://example.com/followers",
-				it:     vocab.IRI("https://example.com"),
+				it:     vocab.Object{ID: "https://example.com"},
 			},
 			wantErr: nil,
 		},
@@ -435,7 +435,7 @@ func Test_repo_AddTo(t *testing.T) {
 			setupFns: []initFn{withOpenRoot, withBootstrap, withItems(&vocab.Object{ID: "https://example.com/example", Type: vocab.NoteType})},
 			args: args{
 				colIRI: "https://example.com/~jdoe/blocked",
-				it:     vocab.IRI("https://example.com/example"),
+				it:     vocab.Object{ID: "https://example.com/example", Type: vocab.NoteType},
 			},
 			wantErr: nil,
 		},
@@ -445,7 +445,7 @@ func Test_repo_AddTo(t *testing.T) {
 			setupFns: []initFn{withOpenRoot, withBootstrap, withCollection("https://example.com/~jdoe/blocked"), withItems(&vocab.Object{ID: "https://example.com/example", Type: vocab.NoteType})},
 			args: args{
 				colIRI: "https://example.com/~jdoe/blocked",
-				it:     vocab.IRI("https://example.com/example"),
+				it:     vocab.Object{ID: "https://example.com/example", Type: vocab.NoteType},
 			},
 			wantErr: nil,
 		},
