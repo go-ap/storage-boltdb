@@ -22,7 +22,7 @@ go.sum:
 test: go.sum clean
 	@touch tests.json
 	$(TEST) $(TEST_FLAGS) -cover $(TEST_TARGET) -json >> tests.json
-	go run github.com/mfridman/tparse@latest -file tests.json
+	go tool tparse -file tests.json
 	@$(RM) ./tests.json
 
 coverage: go.sum clean

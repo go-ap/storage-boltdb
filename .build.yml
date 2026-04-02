@@ -15,4 +15,4 @@ tasks:
       cd storage-boltdb
       git switch -C master origin/master
       make coverage
-      go run github.com/mattn/goveralls@latest -flagname unit-tests -service=${CI_NAME} -coverprofile storage-boltdb.coverprofile -repotokenfile ~/.coveralls.tok
+      go tool goveralls -flagname unit-tests -service=${CI_NAME} -coverprofile storage-boltdb.coverprofile -repotokenfile ~/.coveralls.tok

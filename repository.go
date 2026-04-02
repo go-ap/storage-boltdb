@@ -445,24 +445,10 @@ func delete(r *repo, it vocab.Item) error {
 }
 
 // Create
+// Deprecated
 func (r *repo) Create(col vocab.CollectionInterface) (vocab.CollectionInterface, error) {
-	if r == nil || r.d == nil {
-		return nil, errNotOpen
-	}
-	var err error
-
-	cPath := itemBucketPath(col.GetLink())
-	err = r.d.Update(func(tx *bolt.Tx) error {
-		root, err := rootFromTx(tx, r.root)
-		if err != nil {
-			return err
-		}
-		b, _, err := descendInBucket(root, cPath, true)
-		if err != nil {
-			return errors.Annotatef(err, "Unable to find path %s/%s", r.root, cPath)
-		}
-		return saveRawItem(col, b)
-	})
+	it, err := r.Save(col)
+	col, _ = it.(vocab.CollectionInterface)
 	return col, err
 }
 
