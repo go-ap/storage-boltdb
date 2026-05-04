@@ -6,7 +6,7 @@ require (
 	github.com/go-ap/activitypub v0.0.0-20260416122353-fb80985e153a
 	github.com/go-ap/errors v0.0.0-20260208110149-e1b309365966
 	github.com/go-ap/filters v0.0.0-20260416122840-724cb3c8974c
-	github.com/go-ap/storage-conformance-suite v0.0.0-20260417104420-591ce7c6fa77
+	github.com/go-ap/storage-conformance-suite v0.0.0-20260504122654-fc571e4bdb5a
 	github.com/google/go-cmp v0.7.0
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.4.3

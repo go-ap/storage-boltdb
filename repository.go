@@ -444,14 +444,6 @@ func delete(r *repo, it vocab.Item) error {
 	return deleteItem(r, it.GetLink())
 }
 
-// Create
-// Deprecated
-func (r *repo) Create(col vocab.CollectionInterface) (vocab.CollectionInterface, error) {
-	it, err := r.Save(col)
-	col, _ = it.(vocab.CollectionInterface)
-	return col, err
-}
-
 func itemBucketPath(iri vocab.IRI) []byte {
 	url, err := iri.URL()
 	if err != nil {

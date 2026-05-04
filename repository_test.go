@@ -151,7 +151,7 @@ func defaultCol(iri vocab.IRI) vocab.CollectionInterface {
 
 func withOrderedCollection(iri vocab.IRI) initFn {
 	return func(t *testing.T, r *repo) *repo {
-		if _, err := r.Create(defaultCol(iri)); err != nil {
+		if _, err := r.Save(defaultCol(iri)); err != nil {
 			t.Errorf("unable to save collection %s: %s", iri, err.Error())
 		}
 		return r
@@ -166,7 +166,7 @@ func withCollection(iri vocab.IRI) initFn {
 		Published: time.Now().Round(time.Second).UTC(),
 	}
 	return func(t *testing.T, r *repo) *repo {
-		if _, err := r.Create(col); err != nil {
+		if _, err := r.Save(col); err != nil {
 			t.Errorf("unable to save collection %s: %s", iri, err)
 		}
 		return r
@@ -181,7 +181,7 @@ func withOrderedCollectionHavingItems(t *testing.T, r *repo) *repo {
 		CC:        vocab.ItemCollection{vocab.PublicNS},
 		Published: time.Now().UTC(),
 	}
-	if _, err := r.Create(&col); err != nil {
+	if _, err := r.Save(&col); err != nil {
 		t.Errorf("unable to save collection %s: %s", colIRI, err)
 	}
 	obIRI := vocab.IRI("https://example.com")
@@ -203,7 +203,7 @@ func withCollectionHavingItems(t *testing.T, r *repo) *repo {
 		CC:        vocab.ItemCollection{vocab.PublicNS},
 		Published: time.Now().UTC(),
 	}
-	if _, err := r.Create(&col); err != nil {
+	if _, err := r.Save(&col); err != nil {
 		t.Errorf("unable to save collection %s: %s", colIRI, err)
 	}
 	obIRI := vocab.IRI("https://example.com")
