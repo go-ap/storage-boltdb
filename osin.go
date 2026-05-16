@@ -157,8 +157,8 @@ func (r *repo) loadClientFromTx(id string, c *osin.DefaultClient) func(*bolt.Tx)
 	}
 }
 
-// UpdateClient updates the client (identified by it's id) and replaces the values with the values of client.
-func (r *repo) UpdateClient(c osin.Client) error {
+// SaveClient saves the client (identified by it's id) and replaces the values with the values of client.
+func (r *repo) SaveClient(c osin.Client) error {
 	if r == nil || r.d == nil {
 		return errNotOpen
 	}
@@ -183,11 +183,6 @@ func (r *repo) UpdateClient(c osin.Client) error {
 		}
 		return cb.Put([]byte(cl.Id), raw)
 	})
-}
-
-// CreateClient stores the client in the database and returns an error, if something went wrong.
-func (r *repo) CreateClient(c osin.Client) error {
-	return r.UpdateClient(c)
 }
 
 // RemoveClient removes a client (identified by id) from the database. Returns an error if something went wrong.

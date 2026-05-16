@@ -342,10 +342,10 @@ func Test_repo_SaveXXX_with_brokenEncode(t *testing.T) {
 		encodeFn = oldEncode
 	})
 
-	t.Run("CreateClient", func(t *testing.T) {
-		err := rr.CreateClient(defaultClient)
+	t.Run("SaveClient", func(t *testing.T) {
+		err := rr.SaveClient(defaultClient)
 		if !cmp.Equal(err, wantErr, EquateWeakErrors) {
-			t.Errorf("CreateClient() error = %v, wantErr %v", err, wantErr)
+			t.Errorf("SaveClient() error = %v, wantErr %v", err, wantErr)
 		}
 	})
 
