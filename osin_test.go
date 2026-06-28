@@ -112,22 +112,22 @@ func Test_repo_LoadXXX_with_brokenDecode(t *testing.T) {
 
 	t.Run("LoadMetadata", func(t *testing.T) {
 		err := rr.LoadMetadata("https://example.com/~jdoe", Metadata{Pw: []byte("asd"), PrivateKey: pkcs8Pk})
-		if !errors.Is(err, wantErr) {
-			t.Errorf("LoadMetadata() error = %v, wantErr %v", err, wantErr)
+		if !cmp.Equal(err, wantErr, EquateWeakErrors) {
+			t.Errorf("LoadMetadata() error = %s", cmp.Diff(wantErr, err, EquateWeakErrors))
 		}
 	})
 
 	t.Run("LoadKey", func(t *testing.T) {
 		_, err := rr.LoadKey("https://example.com/~jdoe")
-		if !errors.Is(err, wantErr) {
-			t.Errorf("LoadKey() error = %v, wantErr %v", err, wantErr)
+		if !cmp.Equal(err, wantErr, EquateWeakErrors) {
+			t.Errorf("LoadKey() error = %s", cmp.Diff(wantErr, err, EquateWeakErrors))
 		}
 	})
 
 	t.Run("PasswordCheck", func(t *testing.T) {
 		err := rr.PasswordCheck("https://example.com/~jdoe", []byte("asd"))
-		if !errors.Is(err, wantErr) {
-			t.Errorf("PasswordCheck() error = %v, wantErr %v", err, wantErr)
+		if !cmp.Equal(err, wantErr, EquateWeakErrors) {
+			t.Errorf("PasswordCheck() error = %s", cmp.Diff(wantErr, err, EquateWeakErrors))
 		}
 	})
 }
@@ -168,8 +168,8 @@ func Test_repo_LoadRefresh(t *testing.T) {
 			t.Cleanup(r.Close)
 
 			got, err := r.LoadRefresh(tt.code)
-			if !errors.Is(err, tt.wantErr) {
-				t.Errorf("LoadRefresh() error = %v, wantErr %v", err, tt.wantErr)
+			if !cmp.Equal(err, tt.wantErr, EquateWeakErrors) {
+				t.Errorf("LoadRefresh() error = %s", cmp.Diff(tt.wantErr, err, EquateWeakErrors))
 			}
 			if tt.wantErr != nil {
 				return

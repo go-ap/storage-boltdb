@@ -42,7 +42,7 @@ func (r *repo) PasswordSet(iri vocab.IRI, pw []byte) error {
 	var err error
 	m.Pw, err = bcrypt.GenerateFromPassword(pw, -1)
 	if err != nil {
-		return errors.Annotatef(err, "Could not generate password hash")
+		return errors.Annotatef(err, "could not generate password hash")
 	}
 	return r.SaveMetadata(iri, m)
 }
@@ -64,17 +64,17 @@ func (r *repo) PasswordCheck(iri vocab.IRI, pw []byte) error {
 		var err error
 		b, path, err = descendInBucket(root, path, false)
 		if err != nil {
-			return errors.Newf("Unable to find %s in root bucket", path)
+			return errors.Newf("unable to find %s in root bucket", path)
 		}
 		entryBytes := b.Get([]byte(metaDataKey))
 		if len(entryBytes) == 0 {
 			return errors.NotFoundf("not found")
 		}
 		if err = decodeFn(entryBytes, &m); err != nil {
-			return errors.Annotatef(err, "Could not unmarshal metadata")
+			return errors.Annotatef(err, "could not unmarshal metadata")
 		}
 		if err := bcrypt.CompareHashAndPassword(m.Pw, pw); err != nil {
-			return errors.NewUnauthorized(err, "Invalid pw")
+			return errors.NewUnauthorized(err, "invalid pw")
 		}
 		return nil
 	})
