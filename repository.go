@@ -93,7 +93,7 @@ func (r *repo) loadItem(tx *bolt.Tx, b *bolt.Bucket, matcherFn func([]byte) bool
 	if vocab.IsNil(it) {
 		return nil, errors.NotFoundf("not found")
 	}
-	if it.IsCollection() {
+	if vocab.IsCollection(it) {
 		// we need to dereference them, so no further filtering/processing is needed here
 		return it, nil
 	}
@@ -204,7 +204,7 @@ func (r *repo) loadOneFromBucket(tx *bolt.Tx, iri vocab.IRI, ff ...filters.Check
 	if vocab.IsNil(col) {
 		return nil, errors.NotFoundf("not found")
 	}
-	if !col.IsCollection() {
+	if !vocab.IsCollection(col) {
 		return col, nil
 	}
 	var it vocab.Item
@@ -254,7 +254,7 @@ func (r *repo) iterateInBucket(tx *bolt.Tx, b *bolt.Bucket, iri vocab.IRI, ff ..
 		if vocab.IsNil(it) {
 			continue
 		}
-		if it.IsCollection() {
+		if vocab.IsCollection(it) {
 			_ = vocab.OnCollectionIntf(it, func(c vocab.CollectionInterface) error {
 				itCol, err := r.loadItemsElementsTx(tx, c.Collection(), ff...)
 				if err != nil {
@@ -326,7 +326,7 @@ func (r *repo) loadFromBucket(tx *bolt.Tx, iri vocab.IRI, ff ...filters.Check) (
 		if err != nil {
 			return nil, err
 		}
-		if it.IsCollection() {
+		if vocab.IsCollection(it) {
 			return it, vocab.OnCollectionIntf(it, func(c vocab.CollectionInterface) error {
 				it, err = r.loadItemsElementsTx(tx, c.Collection(), ff...)
 				return err
@@ -429,7 +429,7 @@ const objectKey = "__raw"
 const metaDataKey = "__meta_data"
 
 func delete(r *repo, it vocab.Item) error {
-	if it.IsCollection() {
+	if vocab.IsCollection(it) {
 		return vocab.OnCollectionIntf(it, func(c vocab.CollectionInterface) error {
 			var err error
 			for _, it := range c.Collection() {
@@ -513,11 +513,12 @@ func createCollectionInBucket(parent *bolt.Bucket, it vocab.Item, owner vocab.It
 }
 
 func createCollectionsInBucket(b *bolt.Bucket, it vocab.Item) error {
-	if vocab.IsNil(it) || !it.IsObject() {
+	if vocab.IsNil(it) || !vocab.IsObject(it) {
 		return nil
 	}
+	typ := it.GetType()
 	// create collections
-	if typ := it.GetType(); typ != nil && vocab.ActorTypes.Match(typ) {
+	if vocab.ActorTypes.Match(typ) {
 		_ = vocab.OnActor(it, func(p *vocab.Actor) error {
 			if p.Inbox != nil {
 				p.Inbox, _ = createCollectionInBucket(b, vocab.Inbox.IRI(p), p)
