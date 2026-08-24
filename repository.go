@@ -93,30 +93,43 @@ func (r *repo) loadItem(tx *bolt.Tx, b *bolt.Bucket, matcherFn func([]byte) bool
 	if vocab.IsNil(it) {
 		return nil, errors.NotFoundf("not found")
 	}
-	if vocab.IsCollection(it) {
-		// we need to dereference them, so no further filtering/processing is needed here
-		return it, nil
-	}
 	if vocab.IsIRI(it) {
 		if it, _ = r.loadOneFromBucket(tx, it.GetLink()); vocab.IsNil(it) {
 			return nil, errors.NotFoundf("not found")
 		}
 	}
-	if typ := it.GetType(); typ != nil {
-		if vocab.ActorTypes.Match(typ) {
-			_ = vocab.OnActor(it, loadFilteredPropsForActor(r, tx, ff...))
-		}
-		if vocab.ObjectTypes.Match(typ) {
-			_ = vocab.OnObject(it, loadFilteredPropsForObject(r, tx, ff...))
-		}
-		if vocab.IntransitiveActivityTypes.Match(typ) {
-			_ = vocab.OnIntransitiveActivity(it, loadFilteredPropsForIntransitiveActivity(r, tx, ff...))
-		}
-		if vocab.ActivityTypes.Match(typ) {
-			_ = vocab.OnActivity(it, loadFilteredPropsForActivity(r, tx, ff...))
-		}
+	typ := it.GetType()
+	switch {
+	case vocab.ActorTypes.Match(typ):
+		_ = vocab.OnActor(it, loadFilteredPropsForActor(r, tx, ff...))
+	case vocab.ObjectTypes.Match(typ):
+		_ = vocab.OnObject(it, loadFilteredPropsForObject(r, tx, ff...))
+	case vocab.IntransitiveActivityTypes.Match(typ):
+		_ = vocab.OnIntransitiveActivity(it, loadFilteredPropsForIntransitiveActivity(r, tx, ff...))
+	case vocab.ActivityTypes.Match(typ):
+		_ = vocab.OnActivity(it, loadFilteredPropsForActivity(r, tx, ff...))
+	case vocab.CollectionType.Match(typ):
+		_ = vocab.OnCollection(it, loadFilteredItemsForCollection(r, tx, ff...))
+	case vocab.OrderedCollectionType.Match(typ):
+		_ = vocab.OnOrderedCollection(it, loadFilteredItemsForOrderedCollection(r, tx, ff...))
 	}
 	return it, nil
+}
+
+func loadFilteredItemsForCollection(r *repo, tx *bolt.Tx, ff ...filters.Check) func(c *vocab.Collection) error {
+	return func(c *vocab.Collection) error {
+		var err error
+		c.Items, err = r.loadItemsElementsTx(tx, c.Items, ff...)
+		return err
+	}
+}
+
+func loadFilteredItemsForOrderedCollection(r *repo, tx *bolt.Tx, ff ...filters.Check) func(c *vocab.OrderedCollection) error {
+	return func(c *vocab.OrderedCollection) error {
+		var err error
+		c.OrderedItems, err = r.loadItemsElementsTx(tx, c.OrderedItems, ff...)
+		return err
+	}
 }
 
 func loadFilteredPropsForActor(r *repo, tx *bolt.Tx, ff ...filters.Check) func(a *vocab.Actor) error {
@@ -145,9 +158,10 @@ func loadFilteredPropsForObject(r *repo, tx *bolt.Tx, ff ...filters.Check) func(
 }
 
 func loadFilteredPropsForActivity(r *repo, tx *bolt.Tx, ff ...filters.Check) func(a *vocab.Activity) error {
+	objectChecks := filters.ObjectChecks(ff...)
 	return func(a *vocab.Activity) error {
 		if !vocab.IsNil(a.Object) && vocab.IsIRI(a.Object) {
-			if ob, err := r.loadOneFromBucket(tx, a.Object.GetLink()); err == nil {
+			if ob, err := r.loadOneFromBucket(tx, a.Object.GetLink(), objectChecks...); err == nil {
 				a.Object = ob
 			}
 		}
@@ -156,14 +170,16 @@ func loadFilteredPropsForActivity(r *repo, tx *bolt.Tx, ff ...filters.Check) fun
 }
 
 func loadFilteredPropsForIntransitiveActivity(r *repo, tx *bolt.Tx, ff ...filters.Check) func(a *vocab.IntransitiveActivity) error {
+	actorChecks := filters.ActorChecks(ff...)
+	targetChecks := filters.TargetChecks(ff...)
 	return func(a *vocab.IntransitiveActivity) error {
-		if !vocab.IsNil(a.Actor) && vocab.IsIRI(a.Actor) && len(filters.ActorChecks(ff...)) > 0 {
-			if act, err := r.loadOneFromBucket(tx, a.Actor.GetLink()); err == nil {
+		if !vocab.IsNil(a.Actor) && vocab.IsIRI(a.Actor) && len(actorChecks) > 0 {
+			if act, err := r.loadOneFromBucket(tx, a.Actor.GetLink(), actorChecks...); err == nil {
 				a.Actor = act
 			}
 		}
-		if !vocab.IsNil(a.Target) && vocab.IsIRI(a.Target) && len(filters.TargetChecks(ff...)) > 0 {
-			if t, err := r.loadOneFromBucket(tx, a.Target.GetLink()); err == nil {
+		if !vocab.IsNil(a.Target) && vocab.IsIRI(a.Target) && len(targetChecks) > 0 {
+			if t, err := r.loadOneFromBucket(tx, a.Target.GetLink(), targetChecks...); err == nil {
 				a.Target = t
 			}
 		}
@@ -172,7 +188,6 @@ func loadFilteredPropsForIntransitiveActivity(r *repo, tx *bolt.Tx, ff ...filter
 }
 
 func (r *repo) loadItemsElementsTx(tx *bolt.Tx, iris []vocab.Item, ff ...filters.Check) (vocab.ItemCollection, error) {
-	// TODO(marius): make this accept the bolt.TX directly
 	col := make(vocab.ItemCollection, 0)
 	rb := tx.Bucket(r.root)
 	if rb == nil {
@@ -322,15 +337,9 @@ func (r *repo) loadFromBucket(tx *bolt.Tx, iri vocab.IRI, ff ...filters.Check) (
 	}
 	if len(remainderPath) == 0 {
 		// we have found an item
-		it, err = r.loadItem(tx, b, nil)
+		it, err = r.loadItem(tx, b, nil, ff...)
 		if err != nil {
 			return nil, err
-		}
-		if vocab.IsCollection(it) {
-			return it, vocab.OnCollectionIntf(it, func(c vocab.CollectionInterface) error {
-				it, err = r.loadItemsElementsTx(tx, c.Collection(), ff...)
-				return err
-			})
 		}
 	}
 
@@ -429,12 +438,12 @@ const objectKey = "__raw"
 const metaDataKey = "__meta_data"
 
 func delete(r *repo, it vocab.Item) error {
-	if vocab.IsCollection(it) {
-		return vocab.OnCollectionIntf(it, func(c vocab.CollectionInterface) error {
+	if vocab.IsItemCollection(it) {
+		return vocab.OnItemCollection(it, func(c *vocab.ItemCollection) error {
 			var err error
-			for _, it := range c.Collection() {
-				if err = deleteItem(r, it); err != nil {
-					r.logFn("Unable to remove item %s", it.GetLink())
+			for _, it := range *c {
+				if err = deleteItem(r, it.GetLink()); err != nil {
+					r.logFn("Unable to remove item %s: %v", it.GetLink(), err)
 				}
 			}
 			return nil
@@ -746,9 +755,9 @@ func (r *repo) AddTo(colIRI vocab.IRI, items ...vocab.Item) error {
 		if err != nil {
 			if errors.IsNotFound(err) && isHiddenCollectionKey(colIRI.String()) {
 				// NOTE(marius): for hidden collections we might not have the __raw file on disk, so we just try to create it
-				// Here we assume the owner can be inferred from the collection IRI, but that's just a FedBOX implementation
-				// detail. We should find a different way to pass collection owner - maybe the processing package checks for
-				// existence of the blocked collection, and explicitly creates it if it doesn't.
+				//  Here we assume the owner can be inferred from the collection IRI, but that's just a FedBOX implementation
+				//  detail. We should find a different way to pass collection owner - maybe the processing package checks for
+				//  existence of the blocked collection, and explicitly creates it if it doesn't.
 				maybeOwner, _ := vocab.Split(colIRI)
 				if col, err = createCollection(b, colIRI, maybeOwner); err != nil {
 					return err

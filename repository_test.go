@@ -666,7 +666,7 @@ func Test_repo_Load(t *testing.T) {
 			),
 		},
 		{
-			name: "outbox?type=Question&target.type=Note",
+			name: "outbox?type=Question&target.type=Image",
 			args: args{
 				iri: rootOutboxIRI,
 				fil: filters.Checks{
@@ -675,12 +675,12 @@ func Test_repo_Load(t *testing.T) {
 				},
 			},
 			want: wantsRootOutbox(
-				filters.HasType(vocab.CreateType),
-				filters.Object(filters.HasType(vocab.NoteType)),
+				filters.HasType(vocab.QuestionType),
+				filters.Target(filters.HasType(vocab.ImageType)),
 			),
 		},
 		{
-			name: "outbox?type=Create&object.type=Note",
+			name: "outbox?type=Create&actor.name=Hank",
 			args: args{
 				iri: rootOutboxIRI,
 				fil: filters.Checks{
@@ -690,7 +690,7 @@ func Test_repo_Load(t *testing.T) {
 			},
 			want: wantsRootOutbox(
 				filters.HasType(vocab.CreateType),
-				filters.Object(filters.HasType(vocab.NoteType)),
+				filters.Actor(filters.NameIs("Hank")),
 			),
 		},
 	}
