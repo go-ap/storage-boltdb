@@ -64,8 +64,8 @@ func compareItemCollections(x, y interface{}) bool {
 	if ic2, ok := y.(*vocab.ItemCollection); ok {
 		i2 = *ic2
 	}
-	slices.SortStableFunc(i1, vocab.TimestampSortFunc)
-	slices.SortStableFunc(i2, vocab.TimestampSortFunc)
+	slices.SortStableFunc(i1, filters.TimestampSortFunc)
+	slices.SortStableFunc(i2, filters.TimestampSortFunc)
 	return vocab.ItemsEqual(i1, i2)
 }
 
