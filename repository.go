@@ -806,7 +806,9 @@ func (r *repo) Open() error {
 	if r.d != nil {
 		return nil
 	}
-	db, err := bolt.Open(r.path, 0600, nil)
+	opts := bolt.DefaultOptions
+	opts.Mlock = false
+	db, err := bolt.Open(r.path, 0600, opts)
 	if err == nil {
 		r.d = db
 	}
