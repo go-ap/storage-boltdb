@@ -77,7 +77,7 @@ func loadRawItemFromBucket(b *bolt.Bucket) (vocab.Item, error) {
 	return it, nil
 }
 
-func (r *repo) loadItem(tx *bolt.Tx, b *bolt.Bucket, matcherFn func([]byte) bool, ff ...filters.Check) (vocab.Item, error) {
+func (r *repo) loadItem(tx *bolt.Tx, b *bolt.Bucket, matcherFn func([]byte) bool, checks ...filters.Check) (vocab.Item, error) {
 	// we have found an item
 	raw := b.Get([]byte(objectKey))
 	if raw == nil {
@@ -94,106 +94,92 @@ func (r *repo) loadItem(tx *bolt.Tx, b *bolt.Bucket, matcherFn func([]byte) bool
 		return nil, errors.NotFoundf("not found")
 	}
 	if vocab.IsIRI(it) {
-		if it, _ = r.loadOneFromBucket(tx, it.GetLink()); vocab.IsNil(it) {
+		if it, _ = r.loadItemFromBucket(tx, it.GetLink()); vocab.IsNil(it) {
 			return nil, errors.NotFoundf("not found")
 		}
 	}
 	typ := it.GetType()
 	switch {
 	case vocab.ActorTypes.Match(typ):
-		_ = vocab.OnActor(it, loadFilteredPropsForActor(r, tx, ff...))
+		_ = vocab.OnActor(it, loadFilteredPropsForActor(r, tx, checks...))
 	case vocab.ObjectTypes.Match(typ):
-		_ = vocab.OnObject(it, loadFilteredPropsForObject(r, tx, ff...))
+		_ = vocab.OnObject(it, loadFilteredPropsForObject(r, tx, checks...))
 	case vocab.IntransitiveActivityTypes.Match(typ):
-		_ = vocab.OnIntransitiveActivity(it, loadFilteredPropsForIntransitiveActivity(r, tx, ff...))
+		_ = vocab.OnIntransitiveActivity(it, loadFilteredPropsForIntransitiveActivity(r, tx, checks...))
 	case vocab.ActivityTypes.Match(typ):
-		_ = vocab.OnActivity(it, loadFilteredPropsForActivity(r, tx, ff...))
+		_ = vocab.OnActivity(it, loadFilteredPropsForActivity(r, tx, checks...))
 	case vocab.CollectionType.Match(typ):
-		_ = vocab.OnCollection(it, loadFilteredItemsForCollection(r, tx, ff...))
+		_ = vocab.OnCollection(it, loadFilteredItemsForCollection(r, tx, checks...))
 	case vocab.OrderedCollectionType.Match(typ):
-		_ = vocab.OnOrderedCollection(it, loadFilteredItemsForOrderedCollection(r, tx, ff...))
+		_ = vocab.OnOrderedCollection(it, loadFilteredItemsForOrderedCollection(r, tx, checks...))
 	}
 	return it, nil
 }
 
-func loadFilteredItemsForCollection(r *repo, tx *bolt.Tx, ff ...filters.Check) func(c *vocab.Collection) error {
+func loadFilteredItemsForCollection(r *repo, tx *bolt.Tx, checks ...filters.Check) vocab.WithCollectionFn {
 	return func(c *vocab.Collection) error {
 		var err error
-		c.Items, err = r.loadItemsElementsTx(tx, c.Items, ff...)
+		c.Items, err = r.loadItemsElementsTx(tx, c.Items, checks...)
 		return err
 	}
 }
 
-func loadFilteredItemsForOrderedCollection(r *repo, tx *bolt.Tx, ff ...filters.Check) func(c *vocab.OrderedCollection) error {
+func loadFilteredItemsForOrderedCollection(r *repo, tx *bolt.Tx, checks ...filters.Check) vocab.WithOrderedCollectionFn {
 	return func(c *vocab.OrderedCollection) error {
 		var err error
-		c.OrderedItems, err = r.loadItemsElementsTx(tx, c.OrderedItems, ff...)
+		c.OrderedItems, err = r.loadItemsElementsTx(tx, c.OrderedItems, checks...)
 		return err
 	}
 }
 
-func loadFilteredPropsForActor(r *repo, tx *bolt.Tx, ff ...filters.Check) func(a *vocab.Actor) error {
+func loadFilteredPropsForActor(r *repo, tx *bolt.Tx, checks ...filters.Check) vocab.WithActorFn {
 	return func(a *vocab.Actor) error {
-		return vocab.OnObject(a, loadFilteredPropsForObject(r, tx, ff...))
+		return vocab.OnObject(a, loadFilteredPropsForObject(r, tx, checks...))
 	}
 }
 
-func loadFilteredPropsForObject(r *repo, tx *bolt.Tx, ff ...filters.Check) func(o *vocab.Object) error {
+func loadFilteredPropsForObject(r *repo, tx *bolt.Tx, checks ...filters.Check) vocab.WithObjectFn {
+	tagChecks := filters.TagChecks(checks...)
+	if len(tagChecks) == 0 {
+		tagChecks = filters.Checks{filters.NoType}
+	}
 	return func(o *vocab.Object) error {
-		if vocab.IsNil(o.Tag) {
-			return nil
-		}
-		tags := make(vocab.ItemCollection, 0)
-		err := vocab.OnItem(o.Tag, func(it vocab.Item) error {
-			if vocab.IsNil(it) {
-				return nil
-			}
-			var tag vocab.Item
-			if !vocab.IsIRI(it) {
-				tag = it
-			} else {
-				ob, err := r.loadOneFromBucket(tx, it.GetLink())
-				if err != nil {
-					return nil
-				}
-				if ob = filters.TagChecks(ff...).Run(ob); ob == nil {
-					return nil
-				}
-				tag = it
-			}
-			_ = tags.Append(tag)
-			return nil
-		})
-		if err == nil && len(tags) > 0 {
-			o.Tag = tags.Normalize()
+		var err error
+		if !vocab.IsNil(o.Tag) && len(tagChecks) > 0 {
+			o.Tag, err = r.loadItemFromBucket(tx, o.Tag, checks...)
 		}
 		return err
 	}
 }
 
-func loadFilteredPropsForActivity(r *repo, tx *bolt.Tx, ff ...filters.Check) func(a *vocab.Activity) error {
-	objectChecks := filters.ObjectChecks(ff...)
+var activityTypesThatShouldLoadObjects = vocab.ActivityVocabularyTypes{vocab.UpdateType, vocab.CreateType}
+
+func loadFilteredPropsForActivity(r *repo, tx *bolt.Tx, checks ...filters.Check) vocab.WithActivityFn {
+	objectChecks := filters.ObjectChecks(checks...)
 	return func(a *vocab.Activity) error {
-		if !vocab.IsNil(a.Object) && vocab.IsIRI(a.Object) {
-			if ob, err := r.loadOneFromBucket(tx, a.Object.GetLink(), objectChecks...); err == nil {
+		if len(objectChecks) == 0 && activityTypesThatShouldLoadObjects.Match(a.Type) {
+			objectChecks = filters.Checks{filters.NotNilID}
+		}
+		if !vocab.IsNil(a.Object) && !a.ID.Equal(a.Object.GetID()) && len(objectChecks) > 0 {
+			if ob, err := r.loadItemFromBucket(tx, a.Object, objectChecks...); err == nil {
 				a.Object = ob
 			}
 		}
-		return vocab.OnIntransitiveActivity(a, loadFilteredPropsForIntransitiveActivity(r, tx, ff...))
+		return vocab.OnIntransitiveActivity(a, loadFilteredPropsForIntransitiveActivity(r, tx, checks...))
 	}
 }
 
-func loadFilteredPropsForIntransitiveActivity(r *repo, tx *bolt.Tx, ff ...filters.Check) func(a *vocab.IntransitiveActivity) error {
-	actorChecks := filters.ActorChecks(ff...)
-	targetChecks := filters.TargetChecks(ff...)
+func loadFilteredPropsForIntransitiveActivity(r *repo, tx *bolt.Tx, checks ...filters.Check) vocab.WithIntransitiveActivityFn {
+	actorChecks := filters.ActorChecks(checks...)
+	targetChecks := filters.TargetChecks(checks...)
 	return func(a *vocab.IntransitiveActivity) error {
-		if !vocab.IsNil(a.Actor) && vocab.IsIRI(a.Actor) && len(actorChecks) > 0 {
-			if act, err := r.loadOneFromBucket(tx, a.Actor.GetLink(), actorChecks...); err == nil {
+		if !vocab.IsNil(a.Actor) && len(actorChecks) > 0 && !a.ID.Equal(a.Actor.GetID()) {
+			if act, err := r.loadItemFromBucket(tx, a.Actor, actorChecks...); err == nil {
 				a.Actor = act
 			}
 		}
-		if !vocab.IsNil(a.Target) && vocab.IsIRI(a.Target) && len(targetChecks) > 0 {
-			if t, err := r.loadOneFromBucket(tx, a.Target.GetLink(), targetChecks...); err == nil {
+		if !vocab.IsNil(a.Target) && len(targetChecks) > 0 && !a.ID.Equal(a.Target.GetID()) {
+			if t, err := r.loadItemFromBucket(tx, a.Target, targetChecks...); err == nil {
 				a.Target = t
 			}
 		}
@@ -201,14 +187,14 @@ func loadFilteredPropsForIntransitiveActivity(r *repo, tx *bolt.Tx, ff ...filter
 	}
 }
 
-func (r *repo) loadItemsElementsTx(tx *bolt.Tx, iris []vocab.Item, ff ...filters.Check) (vocab.ItemCollection, error) {
+func (r *repo) loadItemsElementsTx(tx *bolt.Tx, iris []vocab.Item, checks ...filters.Check) (vocab.ItemCollection, error) {
 	col := make(vocab.ItemCollection, 0)
 	rb := tx.Bucket(r.root)
 	if rb == nil {
 		return nil, ErrorInvalidRoot(r.root)
 	}
 	var err error
-	matcherFn := filters.RawMatcher(ff)
+	matcherFn := filters.RawMatcher(checks)
 	for _, iri := range iris {
 		var b *bolt.Bucket
 		remainderPath := itemBucketPath(iri.GetLink())
@@ -225,30 +211,31 @@ func (r *repo) loadItemsElementsTx(tx *bolt.Tx, iris []vocab.Item, ff ...filters
 	return col, err
 }
 
-func (r *repo) loadOneFromBucket(tx *bolt.Tx, iri vocab.IRI, ff ...filters.Check) (vocab.Item, error) {
-	col, err := r.loadFromBucket(tx, iri, ff...)
-	if err != nil {
-		return nil, err
-	}
-	if vocab.IsNil(col) {
-		return nil, errors.NotFoundf("not found")
-	}
-	if !vocab.IsCollection(col) {
-		return col, nil
-	}
-	var it vocab.Item
-	err = vocab.OnCollectionIntf(col, func(c vocab.CollectionInterface) error {
-		it = c.Collection().First()
-		return nil
-	})
+func (r *repo) loadItemFromBucket(tx *bolt.Tx, it vocab.Item, checks ...filters.Check) (vocab.Item, error) {
+	res := make(vocab.ItemCollection, 0)
+	err := vocab.OnItem(it, func(iit vocab.Item) error {
+		if vocab.IsNil(iit) {
+			return nil
+		}
 
-	return it, err
+		if vocab.IsIRI(iit) {
+			ob, err := r.loadFromBucket(tx, iit.GetLink(), checks...)
+			if err != nil {
+				return nil
+			}
+			if ob = filters.Checks(checks).Run(ob); ob != nil {
+				iit = ob
+			}
+		}
+		return res.Append(iit)
+	})
+	return res.Normalize(), err
 }
 
 var orderedCollectionTypes = vocab.ActivityVocabularyTypes{vocab.OrderedCollectionPageType, vocab.OrderedCollectionType}
 var collectionTypes = vocab.ActivityVocabularyTypes{vocab.CollectionPageType, vocab.CollectionType}
 
-func (r *repo) iterateInBucket(tx *bolt.Tx, b *bolt.Bucket, iri vocab.IRI, ff ...filters.Check) (vocab.Item, uint, error) {
+func (r *repo) iterateInBucket(tx *bolt.Tx, b *bolt.Bucket, iri vocab.IRI, checks ...filters.Check) (vocab.Item, uint, error) {
 	if b == nil {
 		return nil, 0, errors.Errorf("invalid bucket to load from")
 	}
@@ -285,7 +272,7 @@ func (r *repo) iterateInBucket(tx *bolt.Tx, b *bolt.Bucket, iri vocab.IRI, ff ..
 		}
 		if vocab.IsCollection(it) {
 			_ = vocab.OnCollectionIntf(it, func(c vocab.CollectionInterface) error {
-				itCol, err := r.loadItemsElementsTx(tx, c.Collection(), ff...)
+				itCol, err := r.loadItemsElementsTx(tx, c.Collection(), checks...)
 				if err != nil {
 					return err
 				}
@@ -311,7 +298,7 @@ var ErrorInvalidRoot = func(b []byte) error {
 	return errors.NotFoundf("Invalid root bucket %s", b)
 }
 
-func (r *repo) loadFromBucket(tx *bolt.Tx, iri vocab.IRI, ff ...filters.Check) (vocab.Item, error) {
+func (r *repo) loadFromBucket(tx *bolt.Tx, iri vocab.IRI, checks ...filters.Check) (vocab.Item, error) {
 	var it vocab.Item
 	rb := tx.Bucket(r.root)
 	if rb == nil {
@@ -338,7 +325,7 @@ func (r *repo) loadFromBucket(tx *bolt.Tx, iri vocab.IRI, ff ...filters.Check) (
 
 	// NOTE(marius): loading items from collection
 	if isStorageCollectionKey(string(fullPath)) {
-		fromBucket, _, err := r.iterateInBucket(tx, b, iri, ff...)
+		fromBucket, _, err := r.iterateInBucket(tx, b, iri, checks...)
 		if err != nil {
 			return nil, err
 		}
@@ -351,7 +338,7 @@ func (r *repo) loadFromBucket(tx *bolt.Tx, iri vocab.IRI, ff ...filters.Check) (
 	}
 	if len(remainderPath) == 0 {
 		// we have found an item
-		it, err = r.loadItem(tx, b, nil, ff...)
+		it, err = r.loadItem(tx, b, nil, checks...)
 		if err != nil {
 			return nil, err
 		}
@@ -361,20 +348,20 @@ func (r *repo) loadFromBucket(tx *bolt.Tx, iri vocab.IRI, ff ...filters.Check) (
 }
 
 // Load
-func (r *repo) Load(i vocab.IRI, fil ...filters.Check) (vocab.Item, error) {
+func (r *repo) Load(i vocab.IRI, checks ...filters.Check) (vocab.Item, error) {
 	if r == nil || r.d == nil {
 		return nil, errNotOpen
 	}
 	var ret vocab.Item
 	err := r.d.View(func(tx *bolt.Tx) error {
-		ob, err := r.loadFromBucket(tx, i, fil...)
+		ob, err := r.loadFromBucket(tx, i, checks...)
 		if err != nil {
 			return err
 		}
 		ret = ob
 		return nil
 	})
-	return filters.Checks(fil).Run(ret), err
+	return filters.Checks(checks).Run(ret), err
 }
 
 var pathSeparator = []byte{'/'}
@@ -784,7 +771,7 @@ func (r *repo) AddTo(colIRI vocab.IRI, items ...vocab.Item) error {
 		err = vocab.OnOrderedCollection(col, func(c *vocab.OrderedCollection) error {
 			for _, it := range items {
 				if vocab.IsIRI(it) {
-					it, err = r.loadOneFromBucket(tx, it.GetLink())
+					it, err = r.loadFromBucket(tx, it.GetLink())
 					if err != nil {
 						return errors.NewNotFound(err, "invalid item to add to collection")
 					}
