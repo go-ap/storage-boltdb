@@ -202,7 +202,7 @@ func (r *repo) loadItemsElementsTx(tx *bolt.Tx, iris []vocab.Item, checks ...fil
 		if err != nil || b == nil {
 			continue
 		}
-		it, err := r.loadItem(tx, b, matcherFn)
+		it, err := r.loadItem(tx, b, matcherFn, checks...)
 		if err != nil || vocab.IsNil(it) {
 			continue
 		}
