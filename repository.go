@@ -522,46 +522,6 @@ func createCollectionInBucket(parent *bolt.Bucket, it vocab.Item, owner vocab.It
 	return saveNewCollection(it, b, owner)
 }
 
-func createCollectionsInBucket(b *bolt.Bucket, it vocab.Item) error {
-	if vocab.IsNil(it) || !vocab.IsObject(it) {
-		return nil
-	}
-	typ := it.GetType()
-	// create collections
-	if vocab.ActorTypes.Match(typ) {
-		_ = vocab.OnActor(it, func(p *vocab.Actor) error {
-			if p.Inbox != nil {
-				p.Inbox, _ = createCollectionInBucket(b, vocab.Inbox.IRI(p), p)
-			}
-			if p.Outbox != nil {
-				p.Outbox, _ = createCollectionInBucket(b, vocab.Outbox.IRI(p), p)
-			}
-			if p.Followers != nil {
-				p.Followers, _ = createCollectionInBucket(b, vocab.Followers.IRI(p), p)
-			}
-			if p.Following != nil {
-				p.Following, _ = createCollectionInBucket(b, vocab.Following.IRI(p), p)
-			}
-			if p.Liked != nil {
-				p.Liked, _ = createCollectionInBucket(b, vocab.Liked.IRI(p), p)
-			}
-			return nil
-		})
-	}
-	return vocab.OnObject(it, func(o *vocab.Object) error {
-		if o.Replies != nil {
-			o.Replies, _ = createCollectionInBucket(b, vocab.Replies.IRI(o), o)
-		}
-		if o.Likes != nil {
-			o.Likes, _ = createCollectionInBucket(b, vocab.Likes.IRI(o), o)
-		}
-		if o.Shares != nil {
-			o.Shares, _ = createCollectionInBucket(b, vocab.Shares.IRI(o), o)
-		}
-		return nil
-	})
-}
-
 // deleteItem
 func deleteItem(r *repo, it vocab.Item) error {
 	pathInBucket := itemBucketPath(it.GetLink())
@@ -616,17 +576,12 @@ func save(r *repo, it vocab.Item) (vocab.Item, error) {
 		if err != nil {
 			return errors.Annotatef(err, "Unable to load root bucket")
 		}
-		b, uuid, err := descendInBucket(root, pathInBucket, true)
+		b, _, err := descendInBucket(root, pathInBucket, true)
 		if err != nil {
 			return errors.Annotatef(err, "Unable to find %s in root bucket", pathInBucket)
 		}
 		if !b.Writable() {
 			return errors.Errorf("Non writeable bucket %s", pathInBucket)
-		}
-		if len(uuid) == 0 {
-			if err := createCollectionsInBucket(b, it); err != nil {
-				return errors.Annotatef(err, "could not create object's collections")
-			}
 		}
 
 		return saveRawItem(it, b)
@@ -678,12 +633,6 @@ func (r *repo) RemoveFrom(colIRI vocab.IRI, items ...vocab.Item) error {
 		col, err := loadRawItemFromBucket(b)
 		if err != nil {
 			return err
-		}
-		if col == nil {
-			col, err = createCollection(b, colIRI, nil)
-			if err != nil {
-				return err
-			}
 		}
 
 		err = vocab.OnOrderedCollection(col, func(c *vocab.OrderedCollection) error {

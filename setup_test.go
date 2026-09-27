@@ -244,10 +244,23 @@ var (
 	allActivities = atomic.Pointer[vocab.ItemCollection]{}
 )
 
+func mockCollection(parent vocab.Item, colType vocab.CollectionPath) vocab.CollectionInterface {
+	return &vocab.OrderedCollection{
+		ID:           colType.Of(parent).GetLink(),
+		Type:         vocab.OrderedCollectionType,
+		AttributedTo: parent.GetLink(),
+		CC:           vocab.ItemCollection{vocab.PublicNS},
+		Published:    publishedTime,
+	}
+}
+
 func withGeneratedRoot(root vocab.Item) initFn {
 	return func(t *testing.T, r *repo) *repo {
 		if _, err := r.Save(root); err != nil {
 			t.Errorf("unable to save root service: %s", err)
+		}
+		if _, err := r.Save(mockCollection(root, vocab.Outbox)); err != nil {
+			t.Errorf("unable to save root service's outbox: %s", err)
 		}
 		return r
 	}
@@ -268,7 +281,7 @@ func withActivitiesToCollections(activities vocab.ItemCollection) initFn {
 	return func(t *testing.T, r *repo) *repo {
 		collectionIRI := vocab.Outbox.IRI(root)
 		if err := r.AddTo(collectionIRI, activities...); err != nil {
-			t.Errorf("unable to addactivities to collection %s: %s", collectionIRI, err)
+			t.Errorf("unable to add activities to collection %s: %s", collectionIRI, err)
 		}
 		return r
 	}
