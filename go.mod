@@ -3,10 +3,10 @@ module github.com/go-ap/storage-boltdb
 go 1.26.0
 
 require (
-	github.com/go-ap/activitypub v0.0.0-20261015123346-723e63a90dc1
+	github.com/go-ap/activitypub v0.0.0-20261018144412-73e07f958d52
 	github.com/go-ap/errors v0.0.0-20260701132509-92e5e4fd6394
-	github.com/go-ap/filters v0.0.0-20261015123504-98ece433d654
-	github.com/go-ap/storage-conformance-suite v0.0.0-20261015124954-d636987393c7
+	github.com/go-ap/filters v0.0.0-20261018144629-c36aa22d954e
+	github.com/go-ap/storage-conformance-suite v0.0.0-20261018145546-8cb9877f5343
 	github.com/google/go-cmp v0.7.0
 	github.com/openshift/osin v1.0.2-0.20220317075346-0f4d38c6e53f
 	go.etcd.io/bbolt v1.5.0
